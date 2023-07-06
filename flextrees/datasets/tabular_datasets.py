@@ -2,7 +2,6 @@ from flex.data import Dataset
 from flex.common import utils
 
 def credit2(out_dir: str = "."):
-    # TODO: Convert dataset to Categorical to use with an ID3 tree.
     # kaggle_path ='brycecf/give-me-some-credit-dataset'
     import os
     import pandas as pd
@@ -23,7 +22,7 @@ def credit2(out_dir: str = "."):
     test_data_object = Dataset(X_data=X_test, y_data=y_test)
     return train_data_object, test_data_object
 
-def nursery(out_dir: str = '.', ret_feature_names: bool = False):
+def nursery(out_dir: str = '.'):
     # sourcery skip: assign-if-exp, extract-method, swap-if-expression
     """Function that load the nursery dataset from UCI database
 
@@ -32,10 +31,10 @@ def nursery(out_dir: str = '.', ret_feature_names: bool = False):
     """
     import os
     import pandas as pd
-    col_names = ['parents', 'has_nurs', 'form', 'children', 'housin', 'finance', 
-        'social', 'health', 'label']
     if not os.path.exists(f"{out_dir}/nursery.csv"):
         path_to_train = "https://archive.ics.uci.edu/ml/machine-learning-databases/nursery/nursery.data"
+        col_names = ['parents', 'has_nurs', 'form', 'children', 'housin', 'finance', 
+                'social', 'health', 'label']
         dataset = pd.read_csv(path_to_train, header=None)
         dataset.columns = col_names
         dataset['label'] = dataset['label'].astype('category')
@@ -50,13 +49,9 @@ def nursery(out_dir: str = '.', ret_feature_names: bool = False):
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.2)
     train_data_object = Dataset(X_data=X_data, y_data=y_data)
     test_data_object = Dataset(X_data=X_test, y_data=y_test)
-    col_names = [f"x{i}" for i in range(len(col_names))]
-    if ret_feature_names:
-        return train_data_object, test_data_object, col_names
     return train_data_object, test_data_object
 
 def adult(out_dir: str = '.'):
-    # TODO: Convert dataset to Categorical to use with an ID3 tree.
     """Function that load the adult dataset from the UCI database
 
     Args:
@@ -114,7 +109,6 @@ def adult(out_dir: str = '.'):
     return train_data_object, test_data_object
 
 def bank(out_dir: str = '.'):
-    # TODO: Convert dataset to Categorical to use with an ID3 tree.
     """Function that load the Bank dataset from the UCI database.
 
     Args:
@@ -144,6 +138,32 @@ def bank(out_dir: str = '.'):
     #####
     y_data = dataset['label'].to_numpy()
     X_data = dataset.drop(columns=['label'], axis=1).to_numpy()
+
+    from sklearn.model_selection import train_test_split
+    X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.3)
+    train_data_object = Dataset(X_data=X_data, y_data=y_data)
+    test_data_object = Dataset(X_data=X_test, y_data=y_test)
+    return train_data_object, test_data_object
+
+def magic(out_dir: str = '.'):
+    """Function that load the Bank dataset from the UCI database.
+
+    Args:
+        out_dir (str, optional): _description_. Defaults to '.'.
+    """
+    import os
+    import pandas as pd
+    if not os.path.exists(f"{out_dir}/magic.csv"):
+        path_to_train = 'http://archive.ics.uci.edu/ml/machine-learning-databases/magic/magic04.data'
+        col_names = ['fLength', 'fWidth', 'fSize', 'fConc', 'fConc1', 'fAsym', 'fM3Long', 'fM3Trans', 'fAlpha', 'fDist', 'label']
+        dataset = pd.read_csv(path_to_train, names=col_names)
+    else:
+        dataset = pd.read_csv(f"{out_dir}/magic.csv", sep=';')
+        col_names = list(dataset.columns)
+    c = {'g':1, 'h':0}
+    # SPLIT DATA INTRO TRAIN-VALIDATION
+    y_data = dataset['target'].apply(lambda x:c[x]).to_numpy()
+    X_data = dataset.drop(['target'], axis=1).to_numpy()
 
     from sklearn.model_selection import train_test_split
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.3)
