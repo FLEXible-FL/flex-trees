@@ -161,7 +161,7 @@ def magic(out_dir: str = '.'):
     import pandas as pd
     if not os.path.exists(f"{out_dir}/magic.csv"):
         path_to_train = 'http://archive.ics.uci.edu/ml/machine-learning-databases/magic/magic04.data'
-        col_names = ['fLength', 'fWidth', 'fSize', 'fConc', 'fConc1', 'fAsym', 'fM3Long', 'fM3Trans', 'fAlpha', 'fDist', 'label']
+        col_names = ['fLength', 'fWidth', 'fSize', 'fConc', 'fConc1', 'fAsym', 'fM3Long', 'fM3Trans', 'fAlpha', 'fDist', 'target']
         dataset = pd.read_csv(path_to_train, names=col_names)
     else:
         dataset = pd.read_csv(f"{out_dir}/magic.csv", sep=';')
