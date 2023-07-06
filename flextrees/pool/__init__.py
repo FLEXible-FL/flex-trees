@@ -3,3 +3,17 @@ from __future__ import division
 from __future__ import print_function
 
 from flextrees.pool.aggregators_fedid3 import id3_agg
+from flextrees.pool.aggregators_fedid3 import id3_aggregate_counts
+from flextrees.pool.aggregators_fedid3 import id3_aggegate_class_counts
+from flextrees.pool.aggregators_fedid3 import id3_aggregate_class_counts_sum
+from flextrees.pool.primitives_fedid3 import build_id3
+from flextrees.pool.primitives_fedid3 import init_server_model_id3
+from flextrees.pool.primitives_fedid3 import deploy_server_config_id3
+from flextrees.pool.primitives_fedid3 import deploy_server_model_id3
+from flextrees.pool.primitives_fedid3 import deploy_node_id3
+from flextrees.pool.primitives_fedid3 import collect_clients_counts_id3
+from flextrees.pool.primitives_fedid3 import collect_clients_class_counts_id3
+from flextrees.pool.primitives_fedid3 import calculate_counts
+from flextrees.pool.primitives_fedid3 import set_aggregated_id3
+from flextrees.pool.primitives_fedid3 import evaluate_id3_model
+from flextrees.pool.primitives_fedid3 import evaluate_global_model_clients
