@@ -2,6 +2,7 @@ from flex.data import Dataset
 from flex.common import utils
 
 def credit2(out_dir: str = "."):
+    # TODO: Convert dataset to Categorical to use with an ID3 tree.
     # kaggle_path ='brycecf/give-me-some-credit-dataset'
     import os
     import pandas as pd
@@ -22,7 +23,7 @@ def credit2(out_dir: str = "."):
     test_data_object = Dataset(X_data=X_test, y_data=y_test)
     return train_data_object, test_data_object
 
-def nursery(out_dir: str = '.'):
+def nursery(out_dir: str = '.', ret_feature_names: bool = False):
     # sourcery skip: assign-if-exp, extract-method, swap-if-expression
     """Function that load the nursery dataset from UCI database
 
@@ -31,10 +32,10 @@ def nursery(out_dir: str = '.'):
     """
     import os
     import pandas as pd
+    col_names = ['parents', 'has_nurs', 'form', 'children', 'housin', 'finance', 
+        'social', 'health', 'label']
     if not os.path.exists(f"{out_dir}/nursery.csv"):
         path_to_train = "https://archive.ics.uci.edu/ml/machine-learning-databases/nursery/nursery.data"
-        col_names = ['parents', 'has_nurs', 'form', 'children', 'housin', 'finance', 
-                'social', 'health', 'label']
         dataset = pd.read_csv(path_to_train, header=None)
         dataset.columns = col_names
         dataset['label'] = dataset['label'].astype('category')
@@ -49,9 +50,13 @@ def nursery(out_dir: str = '.'):
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.2)
     train_data_object = Dataset(X_data=X_data, y_data=y_data)
     test_data_object = Dataset(X_data=X_test, y_data=y_test)
+    col_names = [f"x{i}" for i in range(len(col_names))]
+    if ret_feature_names:
+        return train_data_object, test_data_object, col_names
     return train_data_object, test_data_object
 
 def adult(out_dir: str = '.'):
+    # TODO: Convert dataset to Categorical to use with an ID3 tree.
     """Function that load the adult dataset from the UCI database
 
     Args:
@@ -109,6 +114,7 @@ def adult(out_dir: str = '.'):
     return train_data_object, test_data_object
 
 def bank(out_dir: str = '.'):
+    # TODO: Convert dataset to Categorical to use with an ID3 tree.
     """Function that load the Bank dataset from the UCI database.
 
     Args:
