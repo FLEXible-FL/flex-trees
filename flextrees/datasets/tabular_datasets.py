@@ -150,3 +150,29 @@ def bank(out_dir: str = '.'):
     train_data_object = Dataset(X_data=X_data, y_data=y_data)
     test_data_object = Dataset(X_data=X_test, y_data=y_test)
     return train_data_object, test_data_object
+
+def magic(out_dir: str = '.'):
+    """Function that load the Bank dataset from the UCI database.
+
+    Args:
+        out_dir (str, optional): _description_. Defaults to '.'.
+    """
+    import os
+    import pandas as pd
+    if not os.path.exists(f"{out_dir}/magic.csv"):
+        path_to_train = 'http://archive.ics.uci.edu/ml/machine-learning-databases/magic/magic04.data'
+        col_names = ['fLength', 'fWidth', 'fSize', 'fConc', 'fConc1', 'fAsym', 'fM3Long', 'fM3Trans', 'fAlpha', 'fDist', 'label']
+        dataset = pd.read_csv(path_to_train, names=col_names)
+    else:
+        dataset = pd.read_csv(f"{out_dir}/magic.csv", sep=';')
+        col_names = list(dataset.columns)
+    c = {'g':1, 'h':0}
+    # SPLIT DATA INTRO TRAIN-VALIDATION
+    y_data = dataset['target'].apply(lambda x:c[x]).to_numpy()
+    X_data = dataset.drop(['target'], axis=1).to_numpy()
+
+    from sklearn.model_selection import train_test_split
+    X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.3)
+    train_data_object = Dataset(X_data=X_data, y_data=y_data)
+    test_data_object = Dataset(X_data=X_test, y_data=y_test)
+    return train_data_object, test_data_object
