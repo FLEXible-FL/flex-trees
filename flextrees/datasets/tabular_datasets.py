@@ -1,8 +1,7 @@
 from flex.data import Dataset
-from flex.common import utils
+from flextrees.datasets.preprocessing_utils import preprocess_credit2, preprocess_adult
 
-def credit2(out_dir: str = "."):
-    # TODO: Convert dataset to Categorical to use with an ID3 tree.
+def credit2(out_dir: str = ".", ret_feature_names: bool = False, categorical=True):
     # kaggle_path ='brycecf/give-me-some-credit-dataset'
     import os
     import pandas as pd
@@ -15,15 +14,21 @@ def credit2(out_dir: str = "."):
     else:
         dataset = pd.read_csv(f"{out_dir}/credit2.csv", index_col=0)
     y_data = dataset['Y'].to_numpy()
-    X_data = dataset.drop(columns=['Y'], axis=1).to_numpy()
-
+    if categorical:
+        X_data = preprocess_credit2(dataset.drop(columns=['Y'], axis=1)).to_numpy()
+        # dataset = dataset.drop(columns=['Y'], axis=1).to_numpy()
+    else:
+        X_data = dataset.drop(columns=['Y'], axis=1).to_numpy()
     from sklearn.model_selection import train_test_split
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.2)
-    train_data_object = Dataset(X_data=X_data, y_data=y_data)
-    test_data_object = Dataset(X_data=X_test, y_data=y_test)
+    train_data_object = Dataset.from_numpy(X_data, y_data)
+    test_data_object = Dataset.from_numpy(X_test, y_test)
+    if ret_feature_names:
+        col_names = [f"x{i}" for i in range(len(list(dataset.columns)))]
+        return train_data_object, test_data_object, col_names
     return train_data_object, test_data_object
 
-def nursery(out_dir: str = '.', ret_feature_names: bool = False):
+def nursery(out_dir: str = '.', ret_feature_names: bool = False, categorical=True):
     # sourcery skip: assign-if-exp, extract-method, swap-if-expression
     """Function that load the nursery dataset from UCI database
 
@@ -48,15 +53,14 @@ def nursery(out_dir: str = '.', ret_feature_names: bool = False):
 
     from sklearn.model_selection import train_test_split
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.2)
-    train_data_object = Dataset(X_data=X_data, y_data=y_data)
-    test_data_object = Dataset(X_data=X_test, y_data=y_test)
+    train_data_object = Dataset.from_numpy(X_data, y_data)
+    test_data_object = Dataset.from_numpy(X_test, y_test)
     col_names = [f"x{i}" for i in range(len(col_names))]
     if ret_feature_names:
         return train_data_object, test_data_object, col_names
     return train_data_object, test_data_object
 
-def adult(out_dir: str = '.'):
-    # TODO: Convert dataset to Categorical to use with an ID3 tree.
+def adult(out_dir: str = '.', ret_feature_names: bool = False, categorical=True):
     """Function that load the adult dataset from the UCI database
 
     Args:
@@ -93,8 +97,6 @@ def adult(out_dir: str = '.'):
 
         train_labels = train_data.apply(lambda row: 1 if '>50K' in row['label'] else 0, axis=1).to_numpy()
         test_labels = test_data.apply(lambda row: 1 if '>50K' in row['label'] else 0, axis=1).to_numpy()
-        train_data, feature_types, feature_names = preprocess_adult_no_categorical(train_data.drop(columns=['label'], axis=1))
-        test_data, _, _ = preprocess_adult_no_categorical(test_data.drop(columns=['label'], axis=1))
         train_data['label'] = train_labels
         test_data['label'] = test_labels
         train_data.to_csv(f"{out_dir}/adult_train.csv", index=False)
@@ -102,19 +104,32 @@ def adult(out_dir: str = '.'):
     else:
         train_data = pd.read_csv(f"{out_dir}/adult_train.csv")
         test_data = pd.read_csv(f"{out_dir}/adult_test.csv")
-    y_data = train_data['label'].to_numpy()
-    X_data = train_data.drop(columns=['label'], axis=1).to_numpy()
+    train_labels = train_data['label']
+    test_labels = test_data['label']
+    if categorical:
+        train_data = preprocess_adult(train_data.drop(columns=['label'], axis=1))
+        test_data = preprocess_adult(test_data.drop(columns=['label'], axis=1))
+        train_data = train_data.drop(columns=['x10', 'x11'], axis=1)
+        test_data = test_data.drop(columns=['x10', 'x11'], axis=1)
+    else:
+        train_data, feature_types, feature_names = preprocess_adult_no_categorical(train_data.drop(columns=['label'], axis=1))
+        test_data, _, _ = preprocess_adult_no_categorical(test_data.drop(columns=['label'], axis=1))
+    y_data = train_labels.to_numpy()
+    X_data = train_data.to_numpy()
     from sklearn.model_selection import train_test_split
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.3)
-    # y_test = test_data['label'].to_numpy()
-    # X_test = test_data.drop(columns=['label'], axis=1).to_numpy()
+    # y_test = test_labels.to_numpy()
+    # X_test = test_data.to_numpy()
 
-    train_data_object = Dataset(X_data=X_data, y_data=y_data)
-    test_data_object = Dataset(X_data=X_test, y_data=y_test)
+    train_data_object = Dataset.from_numpy(X_data, y_data)
+    test_data_object = Dataset.from_numpy(X_test, y_test)
+    if ret_feature_names:
+        col_names = [f"x{i}" for i in range(len(list(train_data.columns)))]
+        col_names += ['label']
+        return train_data_object, test_data_object, col_names
     return train_data_object, test_data_object
 
 def bank(out_dir: str = '.'):
-    # TODO: Convert dataset to Categorical to use with an ID3 tree.
     """Function that load the Bank dataset from the UCI database.
 
     Args:
@@ -147,12 +162,12 @@ def bank(out_dir: str = '.'):
 
     from sklearn.model_selection import train_test_split
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.3)
-    train_data_object = Dataset(X_data=X_data, y_data=y_data)
-    test_data_object = Dataset(X_data=X_test, y_data=y_test)
+    train_data_object = Dataset.from_numpy(X_data, y_data)
+    test_data_object = Dataset.from_numpy(X_test, y_test)
     return train_data_object, test_data_object
 
 def magic(out_dir: str = '.'):
-    """Function that load the Bank dataset from the UCI database.
+    """Function that load the Magic dataset from the UCI database.
 
     Args:
         out_dir (str, optional): _description_. Defaults to '.'.
@@ -173,6 +188,76 @@ def magic(out_dir: str = '.'):
 
     from sklearn.model_selection import train_test_split
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.3)
-    train_data_object = Dataset(X_data=X_data, y_data=y_data)
-    test_data_object = Dataset(X_data=X_test, y_data=y_test)
+    train_data_object = Dataset.from_numpy(X_data, y_data)
+    test_data_object = Dataset.from_numpy(X_test, y_test)
+    return train_data_object, test_data_object
+
+def car(out_dir: str = '.', ret_feature_names: bool = False, categorical=True):
+    """Function that load the Car dataset from the UCI database.
+
+    Args:
+        out_dir (str, optional): _description_. Defaults to '.'.
+    """
+    import os
+    import pandas as pd
+    if not os.path.exists(f"{out_dir}/car.csv"):
+        raise FileNotFoundError(
+            "Option not available right now. Please refer to the UCI repository and " + \
+                "manually download the dataset."
+        )
+    else:
+        dataset = pd.read_csv(f"{out_dir}/car.csv", sep=',')
+    col_names = list(dataset.columns)
+    c = {'unacc': 0, 'acc': 1, 'good': 2, 'vgood': 3}
+    y_data = dataset['target'].apply(lambda x: c[x]).to_numpy()
+    # Preprocess the dataset
+    def preprocess_car_no_dict(row):
+        col_changes = {
+            'buying': {
+                'vhigh': 0,
+                'high': 1,
+                'med': 2,
+                'low': 3,
+            },
+            'maint': {
+                'vhigh': 0,
+                'high': 1,
+                'med': 2,
+                'low': 3,
+            },
+            'doors': {
+                '2': 2,
+                '3': 3,
+                '4': 4,
+                '5more': 5
+            },
+            'persons': {
+                '2': 2,
+                '4': 4,
+                'more': 5,
+            },
+            'lug_boot': {
+                'small': 0,
+                'med': 1,
+                'big': 2,
+            },
+            'safety': {
+                'low': 0,
+                'med': 1,
+                'high': 2,
+            },
+        }
+        return pd.Series([col_changes[feature][row[feature]] for feature in list(row.index[:-1])])
+    if categorical:
+        X_data = dataset.drop(['target'], axis=1).to_numpy()
+    else:
+        dataset = dataset.apply(lambda x: preprocess_car_no_dict(x), axis=1)
+        X_data = X_data.to_numpy()
+
+    from sklearn.model_selection import train_test_split
+    X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.3)
+    train_data_object = Dataset.from_numpy(X_data, y_data)
+    test_data_object = Dataset.from_numpy(X_test, y_test)
+    if ret_feature_names:
+        return train_data_object, test_data_object, col_names
     return train_data_object, test_data_object

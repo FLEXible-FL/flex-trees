@@ -1,4 +1,5 @@
 import time
+from copy import deepcopy
 from collections import deque
 import numpy as np
 from numpy.lib import math
@@ -41,6 +42,7 @@ class Node:
         # Updating ID3 -> Use really one node insted of two when adding a node at the tree.
         self.label = None
         self.feature = None
+
 
 class ID3:
     """Class containing the tree structure of the ID3 model.
