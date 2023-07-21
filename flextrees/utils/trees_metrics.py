@@ -117,3 +117,15 @@ def client_write_results(filename, client_id, acc_local, f1_local,
     with open(filename, 'a', newline='', encoding='utf-8') as f:
         wr = csv.writer(f)
         wr.writerow(results)
+
+def server_write_results(filename, client_id, acc_local, f1_local,
+                        tam_test_data, etime):
+    if not os.path.exists(filename):
+        header = ['client_id', 'local_model_acc', 'local_model_f1', 'tam_test_data', 'time']
+        with open(filename, 'a', newline='', encoding='utf-8') as f:
+            wr = csv.writer(f)
+            wr.writerow(header)
+    results = [client_id, acc_local, f1_local, tam_test_data, etime]
+    with open(filename, 'a', newline='', encoding='utf-8') as f:
+        wr = csv.writer(f)
+        wr.writerow(results)
