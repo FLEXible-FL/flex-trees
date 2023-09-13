@@ -38,7 +38,7 @@ def init_server_model_id3(dataset_features: list, config=None, *args, **kwargs):
     if config is None:
         config = {
             'server_params': {
-                'max_depth': 5,
+                'max_depth': len(dataset_features) // 2,
                 'available_features': dataset_features,
                 'dataset_features': dataset_features[:-1],
                 'used_features': [],
