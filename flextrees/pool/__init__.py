@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# Primitive for ID3
 from flextrees.pool.aggregators_fedid3 import id3_agg
 from flextrees.pool.aggregators_fedid3 import id3_aggregate_counts
 from flextrees.pool.aggregators_fedid3 import id3_aggegate_class_counts
@@ -17,3 +18,14 @@ from flextrees.pool.primitives_fedid3 import calculate_counts
 from flextrees.pool.primitives_fedid3 import set_aggregated_id3
 from flextrees.pool.primitives_fedid3 import evaluate_id3_model
 from flextrees.pool.primitives_fedid3 import evaluate_global_model_clients
+# Primitive for RF
+from flextrees.pool.aggregators_fedrf import aggregate_trees_from_rf
+from flextrees.pool.primitives_fedrf import init_server_model_rf
+from flextrees.pool.primitives_fedrf import deploy_server_config_rf
+from flextrees.pool.primitives_fedrf import deploy_server_model_rf
+from flextrees.pool.primitives_fedrf import collect_clients_trees_rf
+from flextrees.pool.primitives_fedrf import set_aggregated_trees_rf
+from flextrees.pool.primitives_fedrf import evaluate_global_rf_model
+from flextrees.pool.primitives_fedrf import evaluate_global_rf_model_at_clients
+from flextrees.pool.primitives_fedrf import evaluate_local_rf_model_at_clients
+from flextrees.pool.primitives_fedrf import train_rf
