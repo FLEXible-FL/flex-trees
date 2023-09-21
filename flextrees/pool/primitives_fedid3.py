@@ -9,7 +9,7 @@ from flex.model import FlexModel
 from flextrees.utils import (
     ID3, Node, reach_root_node, get_df_cut,
     get_feature_with_max_information_gain,
-    client_write_results,
+    client_write_results, server_write_results
 )
 
 from flex.pool.decorators import (
@@ -38,7 +38,7 @@ def init_server_model_id3(dataset_features: list, config=None, *args, **kwargs):
     if config is None:
         config = {
             'server_params': {
-                'max_depth': 5,
+                'max_depth': len(dataset_features) // 2,
                 'available_features': dataset_features,
                 'dataset_features': dataset_features[:-1],
                 'used_features': [],
@@ -97,7 +97,7 @@ def set_aggregated_id3(server_flex_model, aggregated_weights, *args, **kwargs):
 
 @evaluate_server_model
 def evaluate_id3_model(server_flex_model, test_data, *args, **kwargs):
-    test_data, test_labels = test_data.X_data, test_data.y_data
+    test_data, test_labels = test_data.to_numpy()
     clf = server_flex_model['model']
     y_pred = clf.predict(test_data)
     print(f"y_true: {test_labels}")
@@ -107,22 +107,37 @@ def evaluate_id3_model(server_flex_model, test_data, *args, **kwargs):
     print(report)
     print(f"Accuracy: {acc}")
     print(f"F1-Macro: {f1}")
-    client_write_results(filename=kwargs['filename'], client_id='server',
-                        acc_local=acc, f1_local=f1, tam_test_data=len(test_labels))
+    server_write_results(filename=kwargs['filename'], client_id='server',
+                        acc_local=acc, f1_local=f1, tam_test_data=len(test_labels),
+                        etime=kwargs['etime'])
 
 # Function that calculate the counts in the clients.
 def calculate_counts(client_flex_model, client_data, *args, **kwargs):
     node = kwargs['node']
     features = kwargs['features']
-    df_features = client_flex_model['clients_params']['dataset_features']
-    df = pd.DataFrame(client_data.X_data, columns=df_features)
+
+    # Trying to improve recursive functions. Save data in the Clients FlexModel.
+    if 'X_data' not in client_flex_model:
+        X_data, y_data = client_data.to_numpy()
+        client_flex_model['X_data'] = X_data
+        client_flex_model['y_data'] = y_data
+    else:
+        X_data = client_flex_model['X_data']
+        y_data = client_flex_model['y_data']
+
+    if 'df' not in client_flex_model:
+        df_features = client_flex_model['clients_params']['dataset_features']
+        df = pd.DataFrame(X_data, columns=df_features)
+    else:
+        df = client_flex_model['df']
+
     if isinstance(node, Node):
         client_flex_model['clients_params']['available_features'] = features
         stack = reach_root_node(node)
         x_ids, _ = get_df_cut(df, stack)
         feature_ids = [features.index(feature) for feature in features]
-        counts = get_feature_with_max_information_gain(client_data.X_data,
-                                                    client_data.y_data,
+        counts = get_feature_with_max_information_gain(X_data,
+                                                    y_data,
                                                     x_ids, feature_ids,
                                                     features
                                                     )
@@ -148,8 +163,19 @@ def calculate_class_counts(client_flex_model, client_data, *args, **kwargs):
         max class based on the local dataset.
     """
     node = kwargs['node']
-    features = client_flex_model['clients_params']['dataset_features']
-    df = pd.DataFrame(client_data.X_data, columns=features)
+    # features = client_flex_model['clients_params']['dataset_features']
+    # X_data, y_data = client_data.to_numpy()
+    # X_data, y_data = client_flex_model['X_data'], client_flex_model['y_data']
+    # y_data = client_flex_model['y_data']
+    if 'df' not in client_flex_model:
+        X_data, y_data = client_flex_model['X_data'], client_flex_model['y_data']
+        df_features = client_flex_model['clients_params']['dataset_features']
+        df = pd.DataFrame(X_data, columns=df_features)
+        client_flex_model['df'] = df
+    else:
+        y_data = client_flex_model['y_data']
+        df = client_flex_model['df']
+    # df = pd.DataFrame(X_data, columns=features)
     if isinstance(node, Node):
         # Get the node path in a stack.
         stack = reach_root_node(node)
@@ -158,7 +184,7 @@ def calculate_class_counts(client_flex_model, client_data, *args, **kwargs):
         test_feature = [list(node[1].keys())[0], list(node[1].values())[0]]
         stack.extend(test_feature)
     x_ids, _ = get_df_cut(df, stack)
-    labels_in_feature = [client_data.y_data[x] for x in x_ids]
+    labels_in_feature = [y_data[x] for x in x_ids]
     classes, counts = np.unique(labels_in_feature, return_counts=True)
     # class_count = {label: count for label, count in zip(classes, counts)}
     class_count = dict(zip(classes, counts))
@@ -283,7 +309,7 @@ def evaluate_global_model_clients(
     """
     from sklearn import metrics
 
-    X_test, y_test = client_data.X_data, client_data.y_data
+    X_test, y_test = client_data.to_numpy()
     clf = client_flex_model['model']
 
     y_pred = clf.predict(X_test)

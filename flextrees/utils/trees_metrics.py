@@ -86,7 +86,7 @@ def reach_root_node(node):
     stack.reverse()
     return stack
 
-def get_df_cut(df, stack):
+def get_df_cut(df_, stack):
     """Function that receive a stack and get the dataframe cut to the values
     of the features.
     This function helps to get the x_ids to calculate the information_gain
@@ -100,7 +100,7 @@ def get_df_cut(df, stack):
     # query = ' and '.join(feature+"=="+'"'+str(value)+'"' for feature, value in root_path)
     # df = self._df.query(query) if root_path else self._df
     # Once transformed, we have to update the df to the values.
-    df_ = df.copy()
+    # df_ = df.copy()
     for feature, value in root_path:
         df_ = df_.loc[df_[feature] == value]
     x_ids = list(df_.index)
@@ -114,6 +114,18 @@ def client_write_results(filename, client_id, acc_local, f1_local,
             wr = csv.writer(f)
             wr.writerow(header)
     results = [client_id, acc_local, f1_local, tam_test_data]
+    with open(filename, 'a', newline='', encoding='utf-8') as f:
+        wr = csv.writer(f)
+        wr.writerow(results)
+
+def server_write_results(filename, client_id, acc_local, f1_local,
+                        tam_test_data, etime):
+    if not os.path.exists(filename):
+        header = ['client_id', 'local_model_acc', 'local_model_f1', 'tam_test_data', 'time']
+        with open(filename, 'a', newline='', encoding='utf-8') as f:
+            wr = csv.writer(f)
+            wr.writerow(header)
+    results = [client_id, acc_local, f1_local, tam_test_data, etime]
     with open(filename, 'a', newline='', encoding='utf-8') as f:
         wr = csv.writer(f)
         wr.writerow(results)

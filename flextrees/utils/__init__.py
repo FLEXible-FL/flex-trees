@@ -9,3 +9,5 @@ from flextrees.utils.trees_metrics import entropy
 from flextrees.utils.trees_metrics import reach_root_node
 from flextrees.utils.trees_metrics import get_df_cut
 from flextrees.utils.trees_metrics import client_write_results
+from flextrees.utils.trees_metrics import server_write_results
+from flextrees.utils.utils_rf import GlobalRandomForest
