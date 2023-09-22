@@ -159,7 +159,7 @@ def adult(out_dir: str = '.', ret_feature_names: bool = False, categorical=True)
         return train_data_object, test_data_object, col_names
     return train_data_object, test_data_object
 
-def bank(out_dir: str = '.'):
+def bank(out_dir: str = '.', ret_feature_names: bool = False, categorical=False):
     """Function that load the Bank dataset from the UCI database.
 
     Args:

@@ -6,7 +6,7 @@ import argparse
 from flex.data import FedDataDistribution, FedDatasetConfig
 from flex.pool import FlexPool
 
-from flextrees.datasets.tabular_datasets import ildp, adult, car, credit2
+from flextrees.datasets.tabular_datasets import ildp, adult, bank, credit2
 
 from flextrees.pool import (
     init_server_model_rf,
@@ -34,7 +34,7 @@ def main():
     exec = args.exec
     db = args.database
 
-    available_datasets = [ildp, adult, car, credit2]
+    available_datasets = [ildp, adult, bank, credit2]
 
     dataset = available_datasets[db]
 
@@ -58,7 +58,7 @@ def main():
     server = pool.servers
 
     # Total number of estimators
-    total_estimators = 10
+    total_estimators = 100
     # Number of estimators per client
     nr_estimators = total_estimators // n_clients
 

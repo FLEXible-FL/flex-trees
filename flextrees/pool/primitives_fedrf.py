@@ -89,6 +89,14 @@ def train_rf(client_flex_model, client_data, *args, **kwargs):
     clf = RandomForestClassifier(max_depth=client_flex_model['clients_params']['max_depth'], 
                                 n_estimators=client_flex_model['clients_params']['n_estimators'])
     clf.fit(X_train, y_train)
+    rf_classes_ = clf.classes_
+    # Set the classes to the estimators as single trees will have [0, 1] as classes
+    # in a binary problem, but the global model will have the original classes.
+    # This is needed to be able to evaluate the global model on the client, becuase
+    # if not, the prediction with the global model will predict [0, 1] and the classes
+    # could be [1, 2] for example, or [2, 4]. This may be a bug in sklearn.
+    for estimator in clf.estimators_: # Set the classes to the estimators
+        estimator.classes_ = rf_classes_
     client_flex_model['model'] = clf
     return client_flex_model
 
@@ -122,7 +130,6 @@ def evaluate_global_rf_model_at_clients(
 
     client_id = client_flex_model['client_id']
 
-
     acc, f1, report = metrics.accuracy_score(y_test, y_pred), metrics.f1_score(y_test, y_pred, average='macro'), metrics.classification_report(y_test, y_pred)
 
     print("Results on client: ", client_id)
@@ -136,15 +143,7 @@ def evaluate_local_rf_model_at_clients(
 
     X_test, y_test = client_data.to_numpy()
     clf = client_flex_model['model']
-
     y_pred = clf.predict(X_test)
-
-    import time
-    print(clf.classes_)
-    print(clf.estimators_[0].classes_)
-    clf.estimators_[0].classes_ = clf.classes_
-    print(clf.estimators_[0].classes_)
-    time.sleep(10)
 
     if 'client_id' not in client_flex_model.keys():
         client_flex_model['client_id'] = f"client_{random.randint(a=10, b=10000)}" # Create a random ID
