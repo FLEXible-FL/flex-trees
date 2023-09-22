@@ -6,7 +6,7 @@ import argparse
 from flex.data import FedDataDistribution, FedDatasetConfig
 from flex.pool import FlexPool
 
-from flextrees.datasets.tabular_datasets import nursery, adult, car, credit2
+from flextrees.datasets.tabular_datasets import ildp, adult, car, credit2
 
 from flextrees.pool import (
     init_server_model_rf,
@@ -34,7 +34,7 @@ def main():
     exec = args.exec
     db = args.database
 
-    available_datasets = [nursery, adult, car, credit2]
+    available_datasets = [ildp, adult, car, credit2]
 
     dataset = available_datasets[db]
 
@@ -43,25 +43,30 @@ def main():
     train_data, test_data = dataset(ret_feature_names=False, categorical=False)
     n_clients = n_clients
     if dist == 'iid':
-        federated_nursery = FedDataDistribution.iid_distribution(centralized_data=train_data,
+        federated_data = FedDataDistribution.iid_distribution(centralized_data=train_data,
                                                             n_clients=n_clients)
     else:
         config_nidd = FedDatasetConfig(seed=0, n_clients=n_clients, replacement=False)
 
-        federated_nursery = FedDataDistribution.from_config(centralized_data=train_data,
+        federated_data = FedDataDistribution.from_config(centralized_data=train_data,
                                                             config=config_nidd)
     # Set server config
-    pool = FlexPool.client_server_architecture(federated_nursery, init_server_model_rf)
+    pool = FlexPool.client_server_architecture(federated_data, init_server_model_rf)
 
     clients = pool.clients
     aggregator = pool.aggregators
     server = pool.servers
 
+    # Total number of estimators
+    total_estimators = 10
+    # Number of estimators per client
+    nr_estimators = total_estimators // n_clients
+
     # Deploy clients config
     pool.servers.map(func=deploy_server_config_rf, dst_pool=pool.clients)
     pool.clients.map(func=train_rf)
     pool.clients.map(func=evaluate_local_rf_model_at_clients)
-    pool.aggregators.map(func=collect_clients_trees_rf, dst_pool=pool.clients)
+    pool.aggregators.map(func=collect_clients_trees_rf, dst_pool=pool.clients, nr_estimators=nr_estimators)
     pool.aggregators.map(func=aggregate_trees_from_rf)
     pool.aggregators.map(func=set_aggregated_trees_rf, dst_pool=pool.servers)
     pool.servers.map(func=deploy_server_model_rf, dst_pool=pool.clients)

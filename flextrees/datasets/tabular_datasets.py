@@ -1,6 +1,37 @@
 from flex.data import Dataset
 from flextrees.datasets.preprocessing_utils import preprocess_credit2, preprocess_adult
 
+
+def ildp(out_dit: str  = ".", ret_feature_names=False, categorical=False):
+    """Function to load the ILDP dataset from the UCI repository.
+
+    Args:
+        out_dit (str, optional): Pathfile to look for the data. Defaults to ".".
+        cateforical (bool, optional): Transform to categorical. Defaults to False.
+
+    Returns:
+        tuple: Train and test data.
+    """
+    from ucimlrepo import fetch_ucirepo
+    # fetch dataset from UCI repository
+    ilpd_indian_liver_patient_dataset = fetch_ucirepo(id=225)
+    X_data = ilpd_indian_liver_patient_dataset.data.features
+    # Preprocess the dataset. Transform the gender to a binary feature.
+    X_data['Gender'] = X_data.apply(lambda row: 1 if 'Female' in row['Gender'] else 0, axis=1)
+    # Drop the rows with NaN values
+    X_data = X_data.dropna(axis=0)
+    # Get the index of the rows that are not NaN
+    X_data_index = X_data.index.to_list()
+    X_data = X_data.to_numpy()
+    # Get the target values
+    y_data = ilpd_indian_liver_patient_dataset.data.targets.iloc[X_data_index].to_numpy()
+
+    from sklearn.model_selection import train_test_split
+    X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.1)
+    train_data_object = Dataset.from_numpy(X_data, y_data)
+    test_data_object = Dataset.from_numpy(X_test, y_test)
+    return train_data_object, test_data_object
+
 def credit2(out_dir: str = ".", ret_feature_names: bool = False, categorical=True):
     # kaggle_path ='brycecf/give-me-some-credit-dataset'
     import os
@@ -68,6 +99,22 @@ def adult(out_dir: str = '.', ret_feature_names: bool = False, categorical=True)
     """
     import os
     import pandas as pd
+    # Preprocess the dataset
+    def preprocess_adult_no_categorical(trainin_dataset):
+        """Function to preprocess Adult dataset and transform it to a categorical dataset.
+        Function assumes dataset has columns labels ['x0', 'x1', 'x2',...,'x13', 'target']
+        The feature 'fnlwgt' ('x2') will be dropped if it is in the dataset.
+        Args:
+            training_dataset (pd.DataFrame): Adult DataFrame
+        Returns:
+            pd.DataFrame: Adult transformed into a categorical dataset.
+        """
+        from sklearn.feature_extraction import DictVectorizer
+        dv = DictVectorizer()
+        dv_data = dv.fit_transform([dict(row) for index, row in trainin_dataset.iterrows()])
+        dv_data = pd.DataFrame(dv_data.toarray(), columns=dv.feature_names_)
+        feature_types = ['int'] * len(dv.feature_names_)
+        return dv_data, feature_types, dv.feature_names_
     if not os.path.exists(f"{out_dir}/adult_train.csv"):
         path_to_train = 'http://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data'
         path_to_test = 'http://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.test'
@@ -77,23 +124,6 @@ def adult(out_dir: str = '.', ret_feature_names: bool = False, categorical=True)
         test_data = pd.read_csv(path_to_test, names=x_columns + [y_column])
         test_data = test_data.iloc[1:]
         test_data['x0'] = [int(val) for val in test_data['x0']]
-
-        # Preprocess the dataset
-        def preprocess_adult_no_categorical(trainin_dataset):
-            """Function to preprocess Adult dataset and transform it to a categorical dataset.
-            Function assumes dataset has columns labels ['x0', 'x1', 'x2',...,'x13', 'target']
-            The feature 'fnlwgt' ('x2') will be dropped if it is in the dataset.
-            Args:
-                training_dataset (pd.DataFrame): Adult DataFrame
-            Returns:
-                pd.DataFrame: Adult transformed into a categorical dataset.
-            """
-            from sklearn.feature_extraction import DictVectorizer
-            dv = DictVectorizer()
-            dv_data = dv.fit_transform([dict(row) for index, row in trainin_dataset.iterrows()])
-            dv_data = pd.DataFrame(dv_data.toarray(), columns=dv.feature_names_)
-            feature_types = ['int'] * len(dv.feature_names_)
-            return dv_data, feature_types, dv.feature_names_
 
         train_labels = train_data.apply(lambda row: 1 if '>50K' in row['label'] else 0, axis=1).to_numpy()
         test_labels = test_data.apply(lambda row: 1 if '>50K' in row['label'] else 0, axis=1).to_numpy()

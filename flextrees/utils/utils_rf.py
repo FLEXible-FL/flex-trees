@@ -17,16 +17,25 @@ class GlobalRandomForest:
         Returns:
             list: List with the predictions.
         """
+        print(f"Number of estimators: {len(self.estimators_)}")
         predictions = {}
         for estimator in self.estimators_:
             prediction = estimator.predict(X)
+            import time
+            print(prediction)
+            print(f"Estimator classes: {estimator.classes_}")
+            time.sleep(10)
             for i, p in enumerate(prediction):
                 if i not in predictions:
                     predictions[i] = []
                 predictions[i].append(p)
+        print(predictions)
         def most_common(lst):
             return max(set(lst), key=lst.count)
         predictions = [most_common(predictions[i]) for i in range(len(predictions))]
+        # import time
+        # print(predictions)
+        # time.sleep(10)
         return predictions
 
     def __deepcopy__(self, memo):

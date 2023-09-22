@@ -34,11 +34,11 @@ def init_server_model_rf(config=None, *args, **kwargs):
         config = {
             'server_params': {
                 'max_depth': 5,
-                'n_estimators': 10,
+                'n_estimators': 100,
             },
             'clients_params': {
                 'max_depth': 5,
-                'n_estimators': 10,
+                'n_estimators': 100,
             }
         }
 
@@ -65,7 +65,18 @@ def deploy_server_model_rf(server_flex_model, *args, **kwargs):
 
 @collect_clients_weights
 def collect_clients_trees_rf(client_flex_model, *args, **kwargs):
-    return client_flex_model['model'].estimators_
+    # Select random trees given the number of estimators to select
+    # If the number of estimators is 0, then select all the trees
+    nr_estimators = kwargs['nr_estimators']
+    return (
+        np.random.choice(
+            client_flex_model['model'].estimators_,
+            nr_estimators,
+            replace=False,
+        )
+        if nr_estimators > 0
+        else client_flex_model['model'].estimators_
+    )
 
 @set_aggregated_weights
 def set_aggregated_trees_rf(server_flex_model, aggregated_weights, *args, **kwargs):
@@ -127,6 +138,13 @@ def evaluate_local_rf_model_at_clients(
     clf = client_flex_model['model']
 
     y_pred = clf.predict(X_test)
+
+    import time
+    print(clf.classes_)
+    print(clf.estimators_[0].classes_)
+    clf.estimators_[0].classes_ = clf.classes_
+    print(clf.estimators_[0].classes_)
+    time.sleep(10)
 
     if 'client_id' not in client_flex_model.keys():
         client_flex_model['client_id'] = f"client_{random.randint(a=10, b=10000)}" # Create a random ID
