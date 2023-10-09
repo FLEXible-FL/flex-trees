@@ -91,3 +91,24 @@ def collect_hash_tables(client_flex_model, *args, **kwargs):
         list: List with the hash tables from the client
     """
     return client_flex_model['idx_hash_values']
+
+@collect_clients_weights
+def collect_clients_ids(client_flex_model, *args, **kwargs):
+    return client_flex_model['client_id']
+
+@set_aggregated_weights
+def set_ids_clients_into_server(server_flex_model: FlexModel, clients_ids, *args, **kwargs):
+    server_flex_model['clients_ids'] = clients_ids
+    return server_flex_model
+
+@set_aggregated_weights
+def set_hash_tables_to_server(server_flex_model: FlexModel, client_hash_tables, *args, **kwargs):
+    server_flex_model['clients_hash_tables'] = deepcopy(client_hash_tables)
+    return server_flex_model
+
+@deploy_server_model
+def deploy_hash_table_to_clients(server_flex_model: FlexModel, *args, **kwargs):
+    client_flex_model = FlexModel()
+    client_id = kwargs['client_id']
+    client_flex_model['hash_table'] = server_flex_model['clients_hash_tables'][client_id]
+    return client_flex_model

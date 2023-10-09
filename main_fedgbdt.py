@@ -15,9 +15,14 @@ from flextrees.pool import (
     deploy_server_config_gbdt,
     collect_hash_tables,
     aggregate_hash_tables,
+    collect_clients_ids,
+    aggregate_client_ids,
+    set_ids_clients_into_server,
+    set_hash_tables_to_server,
+    deploy_hash_table_to_clients,
 )
 
-def main():
+def main():  # sourcery skip: extract-duplicate-method
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--nclients', type=int, default=2, help='Number of clients')
     parser.add_argument('-d', '--dist', type=str, default='iid', help='Distribution (iid/niid)')
@@ -63,9 +68,20 @@ def main():
     # Preprocessing Stage
     pool.clients.map(func=init_hash_tables) # Init hash tables
     pool.clients.map(func=compute_hash_values) # Calculate the hash tables on the clients
+    # Aggregate ids first
+    pool.aggregators.map(func=collect_clients_ids, dst_pool=pool.clients)
+    pool.aggregators.map(func=aggregate_client_ids)
+    pool.aggregators.map(func=set_ids_clients_into_server, dst_pool=pool.servers)
+    # As client_ids are randomized, we need to collect them before sending
+    # the hash tables.
+    client_ids = server._models['server']['aggregated_weights']
     pool.aggregators.map(func=collect_hash_tables, dst_pool=pool.clients)
     pool.aggregators.map(func=aggregate_hash_tables)
-    # TODO: Finish preprocessing stage
+    pool.aggregators.map(func=set_hash_tables_to_server, dst_pool=pool.servers)
+    for client_id in client_ids:
+        pool.servers.map(func=deploy_hash_table_to_clients, dst_pool=pool.clients, client_id=client_id)
+    # Preprocessing phase ended
+    # Trainig the models
     print("Finish script")
     # Training Stage
 
