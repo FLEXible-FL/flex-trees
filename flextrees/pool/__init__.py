@@ -29,3 +29,10 @@ from flextrees.pool.primitives_fedrf import evaluate_global_rf_model
 from flextrees.pool.primitives_fedrf import evaluate_global_rf_model_at_clients
 from flextrees.pool.primitives_fedrf import evaluate_local_rf_model_at_clients
 from flextrees.pool.primitives_fedrf import train_rf
+# Primitive for FBDT
+from flextrees.pool.aggregators_fegbdt import aggregate_hash_tables
+from flextrees.pool.primitives_fedgbdt import init_server_model_gbdt
+from flextrees.pool.primitives_fedgbdt import init_hash_tables
+from flextrees.pool.primitives_fedgbdt import compute_hash_values
+from flextrees.pool.primitives_fedgbdt import deploy_server_config_gbdt
+from flextrees.pool.primitives_fedgbdt import collect_hash_tables
