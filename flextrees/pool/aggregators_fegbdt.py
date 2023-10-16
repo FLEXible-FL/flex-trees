@@ -3,11 +3,41 @@ from flex.pool.decorators import aggregate_weights
 
 
 @aggregate_weights
-def aggregate_client_ids(aggregated_clients_ids, *args, **kwargs):
-    return aggregated_clients_ids
+def aggregate_transition_step(aggregated_weights, *args, **kwargs):
+    """Function that add into the 'aggregated_weights' from the
+    aggregator the variable `aggregated_weights`.
+    This variable may change depending when using it. For example:
+    - Can "aggregate" the client_ids
+    - Can "aggregate" multiple hash_tables
+    - Can "aggregate" one hash table.
+    This function doesn't really works as a aggregation function,
+    it act's more as a transitional step needed for the communications
+    for the preprocessing and the training stages.
+
+    Args:
+        aggregated_weights (list): List with collected weights
+
+    Returns:
+        list: List with the unchanged weights
+    """
+    return aggregated_weights
 
 @aggregate_weights
-def aggregate_hash_tables(aggregated_hash_tables, *args, **kwargs):
+def aggregate_hash_tables(aggregated_weights, *args, **kwargs):
+    """Function that aggregate the hash tables onto one global
+    hash table.
+
+    Args:
+        aggregated_weights (list): List containing the hash tables
+        from the clients
+    """
+    global_hash_table = []
+    for hash_table in aggregated_weights:
+        global_hash_table.extend(hash_table)
+    return global_hash_table
+
+@aggregate_weights
+def aggregate_hash_tables_deprecated(aggregated_hash_tables, *args, **kwargs):
     """Function that make the all reduce operation of the hash tables.
     With this function we create a matrix for each client with the similar instances ids from other
     clients to their instances. This function correspond to the lines 4-12 from the Algorithm 1 from
@@ -16,6 +46,9 @@ def aggregate_hash_tables(aggregated_hash_tables, *args, **kwargs):
         global_hash_values (list): List containing the ids and the hash values of each instance of
         every client.
     """
+    # aggregated_hash_tables = lista de tamaño n_clientes.
+    # Cada elemento de la lista es la tabla de cada cliente.
+    import time
     aggregated_weights = {}
     for i, client_hash in enumerate(aggregated_hash_tables):
         client_global_hash = []

@@ -461,3 +461,43 @@ class RedisStorage(BaseStorage):
 
     def get_list(self, key):
         return self.storage.lrange(key, 0, -1)
+
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+def first_grad(preds, labels):
+    """Function to update the gradients
+    Args:
+        preds (list/np.array): Predictions by the model
+        labels (list/np.array): True labels
+    Returns:
+        gradients updated
+    """
+    preds = sigmoid(preds)
+    return preds - labels
+
+
+def first_hess(preds):
+    """Function to update the gradients
+    Args:
+        preds (list/np.array): Predictions by the model
+    Returns:
+        hess updated
+    """
+    ...
+    preds = sigmoid(preds)
+    return preds * (1 - preds)
+
+def update_global_gradient_hessian(gradient_, hessian_, global_gradient,
+                                    global_hessian, global_hash_table
+                                    ):
+    """Function that update the gradient and the hessian of the local client,
+    using the aggregated gradients and hessians from other clients.
+    """
+    ...
+
+def update_local_gradient_hessian(base_pred, train_labels):
+    gradients_ = first_grad(base_pred, train_labels)
+    hessians_ = first_hess(base_pred)
+    return gradients_, hessians_
