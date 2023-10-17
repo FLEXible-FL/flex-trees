@@ -17,6 +17,7 @@ from flextrees.pool.aggregators_fegbdt import aggregate_transition_step
 from flextrees.utils import first_grad, first_hess, update_local_gradient_hessian
 from flextrees.utils import LSHash
 from flextrees.utils.utils_trees import TreeBoosting
+from flextrees.utils.utils_gbdt import sigmoid
 
 
 @init_server_model
@@ -37,7 +38,8 @@ def init_server_model_gbdt(config=None, *args, **kwargs):
             'server_params': {
                 'max_depth': 5,
                 'n_estimators': 100,
-                'lr': 0.1,
+                'learning_rate': 0.1,
+                'estimators': [],
             },
             'clients_params': {
                 'max_depth': 5,
@@ -117,8 +119,11 @@ def collect_clients_ids(client_flex_model, *args, **kwargs):
     return client_flex_model['client_id']
 
 @collect_clients_weights
-def collect_client_hash_table(client_flex_model, *args, **kwargs):
-    return client_flex_model['idx_hash_values']
+def collect_client_gradients_hessians_by_idx(client_flex_model, *args, **kwargs):
+    idx = kwargs['idx']
+    gradients_ = client_flex_model['gradients'][idx]
+    hessians_ = client_flex_model['hessians'][idx]
+    return (gradients_, hessians_)
 
 @set_aggregated_weights
 def send_hash_table_to_server(server_flex_model: FlexModel, hash_table_j, *args, **kwargs):
@@ -135,6 +140,7 @@ def set_hash_tables_to_server(server_flex_model: FlexModel, global_hash_table, *
 @set_aggregated_weights
 def set_last_tree_trained_to_server(server_flex_model: FlexModel, last_clf, *args, **kwargs):
     server_flex_model['last_tree_trained'] = deepcopy(last_clf[0])
+    server_flex_model['server_params']['estimators'].append(deepcopy(last_clf[0]))
 
 @deploy_server_model
 def deploy_hash_table_to_clients(server_flex_model: FlexModel, *args, **kwargs):
@@ -169,23 +175,27 @@ def update_gradients_hessians_local_values(client_flex_model: FlexModel, client_
         raise ValueError(f"The {idx} is not in the client's data.")
 
 def get_client_hash_tables(client_flex_model: FlexModel, client_data: Dataset, *args, **kwargs):
-    return client_flex_model['idx_hash_values']
+    # return client_flex_model['idx_hash_values']
+    return client_flex_model['global_hash_table']
+
+def get_client_gradients_hessians_by_idx(client_flex_model: FlexModel, client_data: Dataset, *args, **kwargs):
+    idx = kwargs['idx']
+    if isinstance(idx, int) and idx in client_flex_model['idx']:
+        return client_flex_model['gradients'][idx], client_flex_model['hessians'][idx]
+    else:
+        raise ValueError(f"The {idx} is not in the client's data.")
 
 def map_reduce_hash_tables(clients: FlexPool, server: FlexPool, aggregator: FlexPool):
-    import time
-    # breakpoint()
     for m, client_m in enumerate(clients):
-        # breakpoint()
         # Compute on client_m
         for j, client_j in enumerate(clients):
             if m != j:
-                aggregator.map(func=collect_client_hash_table, dst_pool=client_j)
+                aggregator.map(func=collect_hash_tables, dst_pool=client_j)
                 aggregator.map(func=aggregate_transition_step)
                 aggregator.map(func=send_hash_table_to_server, dst_pool=server)
                 server.map(func=deploy_client_j_has_table_to_client, dst_pool=client_m)
                 # Once the client_m has the hash_table, he can find the better instances
                 client_m.map(func=find_instance_highest_count_hash_values)
-                # time.sleep(10)
                 # hash_table_j = client_j.map(func=get_client_hash_tables)
                 # client.map(func=find_similar_instances_hash_value, hash_table_j=hash_table_j)
             else:
@@ -201,12 +211,10 @@ def find_instance_highest_count_hash_values(client_flex_model: FlexModel, client
         client_flex_model (FlexModel): Client that computes the operations
         client_data (Dataset): Client's data
     """
-    import time
     assert 'hash_table_j' in client_flex_model.keys()
     hash_table_j = client_flex_model['hash_table_j'][0]
     client_global_hash = []
     # Iterate over the local hash table
-    # breakpoint()
     client_id_i = client_flex_model['client_id']
     for instance_i in client_flex_model['idx_hash_values']:
         # breakpoint()
@@ -228,7 +236,6 @@ def find_instance_highest_count_hash_values(client_flex_model: FlexModel, client
         similar_id = id_options[max_count][random.randint(0, len(id_options[max_count])-1)] if len(
             id_options[max_count]) > 0 else id_options[max_count]
         similar_instances_ids[client_id_i].append(similar_id)
-        # print(f"Len similar_instances of instance_i: {len(similar_instances_ids[client_id_i])}")
     client_global_hash.append(similar_instances_ids)
     client_flex_model['global_hash_table'] = client_global_hash
 
@@ -268,3 +275,22 @@ def clients_add_last_tree_trained_to_estimators(client_flex_model, client_data, 
     client_flex_model['clients_params']['estimators'].append(deepcopy(client_flex_model['last_tree_trained']))
     print(f"Lenght estimators after adding: {len(client_flex_model['clients_params']['estimators'])}")
     del client_flex_model['last_tree_trained']
+
+@evaluate_server_model
+def evaluate_global_model(server_flex_model: FlexModel, test_data: Dataset, *args, **kwargs):
+    test_data, test_labels = test_data.to_numpy()
+    preds = np.zeros(test_data.shape[0])
+    estimators = server_flex_model['server_params']['estimators']
+    learning_rate = server_flex_model['server_params']['learning_rate']
+
+    for clf in estimators:
+        preds *= learning_rate * clf.predict(test_data)
+
+    predicted_probas = sigmoid(np.full((test_data.shape[0], 1), 1).flatten().astype('float64') + preds)
+    y_pred = np.where(predicted_probas > np.mean(predicted_probas), 1, 0)
+
+    from sklearn import metrics
+    acc, f1, report = metrics.accuracy_score(test_labels, y_pred), metrics.f1_score(test_labels, y_pred, average='macro'), metrics.classification_report(test_labels, y_pred)  # noqa: E501
+    print(f"Accuracy: {acc}")
+    print(f"F1_Macro: {f1}")
+    print(report)

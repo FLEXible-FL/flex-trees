@@ -37,8 +37,8 @@ from flextrees.pool.primitives_fedgbdt import init_hash_tables
 from flextrees.pool.primitives_fedgbdt import compute_hash_values
 from flextrees.pool.primitives_fedgbdt import deploy_server_config_gbdt
 from flextrees.pool.primitives_fedgbdt import collect_hash_tables
+from flextrees.pool.primitives_fedgbdt import collect_client_gradients_hessians_by_idx
 from flextrees.pool.primitives_fedgbdt import collect_clients_ids
-from flextrees.pool.primitives_fedgbdt import collect_client_hash_table
 from flextrees.pool.primitives_fedgbdt import collect_last_tree_trained
 from flextrees.pool.primitives_fedgbdt import set_ids_clients_into_server
 from flextrees.pool.primitives_fedgbdt import set_hash_tables_to_server
@@ -53,6 +53,8 @@ from flextrees.pool.primitives_fedgbdt import deploy_client_j_has_table_to_clien
 from flextrees.pool.primitives_fedgbdt import update_gradients_hessians_local_values
 from flextrees.pool.primitives_fedgbdt import train_single_tree_at_client
 from flextrees.pool.primitives_fedgbdt import clients_add_last_tree_trained_to_estimators
+from flextrees.pool.primitives_fedgbdt import get_client_gradients_hessians_by_idx
+from flextrees.pool.primitives_fedgbdt import evaluate_global_model
 # Functions from pool_functions
 from flextrees.pool.pool_functions import select_client_by_id_from_pool
 from flextrees.pool.pool_functions import select_client_neq_id_from_pool

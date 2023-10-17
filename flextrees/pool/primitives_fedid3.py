@@ -100,8 +100,6 @@ def evaluate_id3_model(server_flex_model, test_data, *args, **kwargs):
     test_data, test_labels = test_data.to_numpy()
     clf = server_flex_model['model']
     y_pred = clf.predict(test_data)
-    print(f"y_true: {test_labels}")
-    print(f"y_pred: {y_pred}")
     from sklearn import metrics
     acc, f1, report = metrics.accuracy_score(test_labels, y_pred), metrics.f1_score(test_labels, y_pred, average='macro'), metrics.classification_report(test_labels, y_pred)  # noqa: E501
     print(report)

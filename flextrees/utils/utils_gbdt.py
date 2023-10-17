@@ -495,7 +495,8 @@ def update_global_gradient_hessian(gradient_, hessian_, global_gradient,
     """Function that update the gradient and the hessian of the local client,
     using the aggregated gradients and hessians from other clients.
     """
-    ...
+    for idx, row in enumerate(global_hash_table):
+        ...
 
 def update_local_gradient_hessian(base_pred, train_labels):
     gradients_ = first_grad(base_pred, train_labels)
