@@ -32,6 +32,7 @@ from flextrees.pool import (
     clients_add_last_tree_trained_to_estimators,
     get_client_gradients_hessians_by_idx,
     evaluate_global_model,
+    evaluate_global_model_clients_gbdt,
 )
 
 
@@ -57,6 +58,7 @@ def main():  # sourcery skip: extract-duplicate-method
     start_time = time.time()
 
     train_data, test_data = dataset(ret_feature_names=False, categorical=False)
+    dataset_dim = train_data.to_numpy()[0].shape[1] # We need the dimension to create the LSH hyper planes
     n_clients = n_clients
     if dist == 'iid':
         federated_data = FedDataDistribution.iid_distribution(centralized_data=train_data,
@@ -67,7 +69,7 @@ def main():  # sourcery skip: extract-duplicate-method
         federated_data = FedDataDistribution.from_config(centralized_data=train_data,
                                                             config=config_nidd)
     # Set server config
-    pool = FlexPool.client_server_architecture(federated_data, init_server_model_gbdt)
+    pool = FlexPool.client_server_architecture(federated_data, init_server_model_gbdt, dataset_dim=dataset_dim)
 
     clients = pool.clients
     aggregator = pool.aggregators
@@ -90,10 +92,10 @@ def main():  # sourcery skip: extract-duplicate-method
     # the hash tables.
     client_ids = server._models['server']['aggregated_weights'] # Generated at client lvl
     # BEGINNING OF THE PREPROCESSING STAGE
-    pool.aggregators.map(func=collect_hash_tables, dst_pool=pool.clients)
-    pool.aggregators.map(func=aggregate_hash_tables)
-    pool.aggregators.map(func=set_hash_tables_to_server, dst_pool=pool.servers)
-    pool.servers.map(func=deploy_hash_table_to_clients, dst_pool=pool.clients)
+    # pool.aggregators.map(func=collect_hash_tables, dst_pool=pool.clients)
+    # pool.aggregators.map(func=aggregate_hash_tables)
+    # pool.aggregators.map(func=set_hash_tables_to_server, dst_pool=pool.servers)
+    # pool.servers.map(func=deploy_hash_table_to_clients, dst_pool=pool.clients)
     # Now the server has all the hash_tables
     # Apply the Map_reduce operation
     map_reduce_hash_tables(clients=pool.clients, server=pool.servers, aggregator=pool.aggregators)
@@ -102,7 +104,7 @@ def main():  # sourcery skip: extract-duplicate-method
     # END OF PREPROCESSING STAGE
     print("STARTING THE TRAINIG STAGE")
     # BEGINNING OF THE TRAININ STAGE
-    for round in range(total_estimators):
+    for _ in range(total_estimators):
         if estimators_built >= total_estimators:
             print(f"Model number: {estimators_built} has been trained. Ending training phase.")
             break
@@ -110,7 +112,7 @@ def main():  # sourcery skip: extract-duplicate-method
         for cl_i, client_id_i in zip(client_ids, clients):
             client_i = pool.clients.select(select_client_by_id_from_pool, other_actor_id=client_id_i)
             # Get the hash_table from the client
-            hash_vector_i = client_i.map(func=get_client_hash_tables)[0]
+            hash_vector_i = client_i.map(func=get_client_hash_tables)
             # print(f"Tabla hash cliente_i: {type(hash_vector_i[0])}")
             # print(f"Tabla hash cliente_i: {(hash_vector_i[0])}")
             # print(f"Client_i: {client_i.actor_ids}")
@@ -125,9 +127,9 @@ def main():  # sourcery skip: extract-duplicate-method
                     hessians_ = {}
                     # Get the hash_table from client_id_j
                     client_j = pool.clients.select(select_client_by_id_from_pool, other_actor_id=client_id_j)
-                    hash_vector_j = client_j.map(func=get_client_hash_tables)[0]
+                    hash_vector_j = client_j.map(func=get_client_hash_tables)
                     # time.sleep(60)
-                    # breakpoint()
+                    breakpoint()
                     for instance_vector in hash_vector_j:
                         for key, _ in instance_vector.items():
                             idx_j = int(key.split(',')[1])
@@ -147,7 +149,6 @@ def main():  # sourcery skip: extract-duplicate-method
                         # TODO: client_i.map(gh_update, gradients, hessians)
                         # breakpoint()
             # Conduct on client_i
-            # TODO: client_i.map(update_gradients_hessians_local_values, idx="all")
             client_i.map(update_gradients_hessians_local_values, idx="all")
             # Train the model at the client_i
             print(f"Training model number: {estimators_built}")
@@ -166,7 +167,10 @@ def main():  # sourcery skip: extract-duplicate-method
             estimators_built += 1
     # END OF TRAINING STAGE
     # EVALUATE THE GLOBAL MODEL
+    # On server's side
     server.map(evaluate_global_model, test_data=test_data)
+    # On clients side
+    clients.map(evaluate_global_model_clients_gbdt)
     # server.map(evaluate_server_global_model, test_data=test_data) # Future names aprox
     print("Finish script")
 

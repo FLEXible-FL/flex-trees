@@ -55,7 +55,9 @@ def init_server_model_gbdt(config=None, *args, **kwargs):
         }
 
     server_flex_model['model'] = []
-
+    dataset_dim = kwargs['dataset_dim']
+    n_hash_tables = min(40, dataset_dim - 1)
+    server_flex_model['lsh'] = LSHash(hash_size=8, input_dim=dataset_dim, num_hashtables=n_hash_tables)
     server_flex_model.update(config)
 
     return server_flex_model
@@ -66,20 +68,18 @@ def deploy_server_config_gbdt(server_flex_model, *args, **kwargs):
 
     client_flex_model['clients_params'] = deepcopy(server_flex_model['clients_params'])
     client_flex_model['client_id'] = f"client_{random.randint(a=10, b=10000)}" # Create a random ID
+    client_flex_model['lsh'] = deepcopy(server_flex_model['lsh'])
     return client_flex_model
 
 # Functions at client level for calculating their own hash values.
 def init_hash_tables(client_flex_model: FlexModel, client_data: Dataset, *args, **kwargs):
     """Function deprecated. Moved to the server
     """
-    n_hash_tables = min(40, client_data.X_data.to_numpy().shape[1] - 1)
-    client_flex_model['n_hashtables'] = n_hash_tables
-    lsh = LSHash(hash_size=8, input_dim=client_data.X_data.to_numpy().shape[1], num_hashtables=n_hash_tables)
-    client_flex_model['lsh'] = lsh
     client_flex_model['base_pred'] = np.full((client_data.X_data.to_numpy().shape[0], 1), 1).flatten().astype('float64')
     client_flex_model['gradients'] = first_grad(client_flex_model['base_pred'], client_data.y_data.to_numpy())
     client_flex_model['hessians'] = first_hess(client_flex_model['base_pred'])
     client_flex_model['idx'] = np.arange(len(client_data.y_data.to_numpy()))
+    client_flex_model['global_hash_table'] = {}
     client_flex_model['global_gradients'] = {idx:0 for idx in client_flex_model['idx']}
     client_flex_model['global_hessians'] = {idx:0 for idx in client_flex_model['idx']}
 
@@ -163,12 +163,18 @@ def deploy_last_clf(server_flex_model: FlexModel, *args, **kwargs):
 def update_gradients_hessians_local_values(client_flex_model: FlexModel, client_data: Dataset, *args, **kwargs):
     idx = kwargs['idx']
     if idx == 'all':
+        # print(f"Global_gradients b4  updating: {client_flex_model['global_gradients']}")
         for idx in client_flex_model['idx']:
             client_flex_model['global_gradients'][idx] += client_flex_model['gradients'][idx]
             client_flex_model['global_hessians'][idx] += client_flex_model['hessians'][idx]
+        # print(f"Global_gradients after  updating: {client_flex_model['global_gradients']}")
     elif isinstance(idx, int) and idx in client_flex_model['idx']:
+        print(f"Global_gradients b4  updating idx: {client_flex_model['global_gradients'][idx]}")
         client_flex_model['global_gradients'][idx] += client_flex_model['gradients'][idx]
         client_flex_model['global_hessians'][idx] += client_flex_model['hessians'][idx]
+        print(f"Global_gradients b4  updating idx: {client_flex_model['global_gradients'][idx]}")
+        import time
+        time.sleep(5)
     else:
         raise ValueError(f"The {idx} is not in the client's data.")
 
@@ -202,7 +208,7 @@ def map_reduce_hash_tables(clients: FlexPool, server: FlexPool, aggregator: Flex
                 # Instances of client m are equal to instances of client m
                 # We don't need to store them, just continue
                 ...
-        ...
+            
 
 def find_instance_highest_count_hash_values(client_flex_model: FlexModel, client_data: Dataset, *args, **kwargs):
     """Function that computes on client the operations to find the similar instances
@@ -213,16 +219,14 @@ def find_instance_highest_count_hash_values(client_flex_model: FlexModel, client
     """
     assert 'hash_table_j' in client_flex_model.keys()
     hash_table_j = client_flex_model['hash_table_j'][0]
-    client_global_hash = []
     # Iterate over the local hash table
     client_id_i = client_flex_model['client_id']
+    id_options = {}
     for instance_i in client_flex_model['idx_hash_values']:
-        # breakpoint()
         client_id_i = instance_i[0]
         dict_i = instance_i[1]
         similar_instances_ids = {client_id_i: []}
         for instance_j in hash_table_j:
-            id_options = {}
             client_id_j, dict_j = instance_j[0], instance_j[1]
             counts = sum(
                 {k: 1 if dict_i.get(k) == dict_j.get(k) else 0 for k in dict_i.keys()}.values()
@@ -236,8 +240,11 @@ def find_instance_highest_count_hash_values(client_flex_model: FlexModel, client
         similar_id = id_options[max_count][random.randint(0, len(id_options[max_count])-1)] if len(
             id_options[max_count]) > 0 else id_options[max_count]
         similar_instances_ids[client_id_i].append(similar_id)
-    client_global_hash.append(similar_instances_ids)
-    client_flex_model['global_hash_table'] = client_global_hash
+    # Add the similar_instances_ids to the clients global_hash_table
+    if client_id_i not in client_flex_model['global_hash_table']:
+        client_flex_model['global_hash_table'][client_id_i] = [list(similar_instances_ids.values())[0][0]]
+    else:
+        client_flex_model['global_hash_table'][client_id_i].append(list(similar_instances_ids.values())[0][0])
 
 def train_single_tree_at_client(client_flex_model, client_data, *args, **kwargs):
     clf = TreeBoosting(max_deph=client_flex_model['clients_params']['max_depth'])
@@ -292,3 +299,30 @@ def evaluate_global_model(server_flex_model: FlexModel, test_data: Dataset, *arg
     print(f"Accuracy: {acc}")
     print(f"F1_Macro: {f1}")
     print(report)
+
+def evaluate_global_model_clients_gbdt(
+    client_flex_model: FlexModel(),
+    client_data: Dataset,
+    *args, **kwargs
+):
+    from sklearn import metrics
+
+    X_test, y_test = client_data.to_numpy()
+    preds = np.zeros(X_test.shape[0])
+    estimators = client_flex_model['clients_params']['estimators']
+    learning_rate = client_flex_model['clients_params']['learning_rate']
+
+    for clf in estimators:
+        preds *= learning_rate * clf.predict(X_test)
+
+    predicted_probas = sigmoid(np.full((X_test.shape[0], 1), 1).flatten().astype('float64') + preds)
+    y_pred = np.where(predicted_probas > np.mean(predicted_probas), 1, 0)
+
+    client_id = client_flex_model['client_id']
+
+    acc, f1, report = metrics.accuracy_score(y_test, y_pred), metrics.f1_score(y_test, y_pred, average='macro'), metrics.classification_report(y_test, y_pred)  # noqa: E501
+
+    print("Results on test data at client level.")
+    print(f"Accuracy: {acc}")
+    print(f"Macro F1: {f1}")
+    print(f"Classificarion report: \n {report}")

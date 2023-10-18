@@ -55,6 +55,7 @@ from flextrees.pool.primitives_fedgbdt import train_single_tree_at_client
 from flextrees.pool.primitives_fedgbdt import clients_add_last_tree_trained_to_estimators
 from flextrees.pool.primitives_fedgbdt import get_client_gradients_hessians_by_idx
 from flextrees.pool.primitives_fedgbdt import evaluate_global_model
+from flextrees.pool.primitives_fedgbdt import evaluate_global_model_clients_gbdt
 # Functions from pool_functions
 from flextrees.pool.pool_functions import select_client_by_id_from_pool
 from flextrees.pool.pool_functions import select_client_neq_id_from_pool
