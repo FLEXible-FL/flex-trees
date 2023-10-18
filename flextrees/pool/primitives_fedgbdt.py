@@ -36,13 +36,13 @@ def init_server_model_gbdt(config=None, *args, **kwargs):
     if config is None:
         config = {
             'server_params': {
-                'max_depth': 5,
+                'max_depth': 8,
                 'n_estimators': 100,
                 'learning_rate': 0.1,
                 'estimators': [],
             },
             'clients_params': {
-                'max_depth': 5,
+                'max_depth': 8,
                 'n_estimators': 100,
                 'n_hashtables': 0,
                 'gradients': None,
@@ -72,8 +72,6 @@ def deploy_server_config_gbdt(server_flex_model, *args, **kwargs):
 def init_hash_tables(client_flex_model: FlexModel, client_data: Dataset, *args, **kwargs):
     """Function deprecated. Moved to the server
     """
-    print("INIT HASH TABLES")
-    print(list(client_flex_model.keys()))
     n_hash_tables = min(40, client_data.X_data.to_numpy().shape[1] - 1)
     client_flex_model['n_hashtables'] = n_hash_tables
     lsh = LSHash(hash_size=8, input_dim=client_data.X_data.to_numpy().shape[1], num_hashtables=n_hash_tables)
@@ -186,9 +184,11 @@ def get_client_gradients_hessians_by_idx(client_flex_model: FlexModel, client_da
         raise ValueError(f"The {idx} is not in the client's data.")
 
 def map_reduce_hash_tables(clients: FlexPool, server: FlexPool, aggregator: FlexPool):
-    for m, client_m in enumerate(clients):
+    for m, client_m_id in enumerate(clients):
         # Compute on client_m
-        for j, client_j in enumerate(clients):
+        client_m = clients.select(lambda a, b: a==client_m_id)
+        for j, client_j_id in enumerate(clients):
+            client_j = clients.select(lambda a, b: a==client_j_id)
             if m != j:
                 aggregator.map(func=collect_hash_tables, dst_pool=client_j)
                 aggregator.map(func=aggregate_transition_step)
@@ -271,9 +271,7 @@ def clients_add_last_tree_trained_to_estimators(client_flex_model, client_data, 
         client_flex_model (FlexModel): client's FlexModel
         client_data (Dataset): Client's Dataset
     """
-    print(f"Lenght estimators b4 adding: {len(client_flex_model['clients_params']['estimators'])}")
     client_flex_model['clients_params']['estimators'].append(deepcopy(client_flex_model['last_tree_trained']))
-    print(f"Lenght estimators after adding: {len(client_flex_model['clients_params']['estimators'])}")
     del client_flex_model['last_tree_trained']
 
 @evaluate_server_model

@@ -41,12 +41,14 @@ def main():  # sourcery skip: extract-duplicate-method
     parser.add_argument('-d', '--dist', type=str, default='iid', help='Distribution (iid/niid)')
     parser.add_argument('-ne', '--exec', type=int, default=0, help='Number of execution')
     parser.add_argument('-db', '--database', type=int, default=0, help='Database to use: 0: Nursery, 1:Adult, 2: Car, 3:Credit2')
+    parser.add_argument('-e', '--estimators', type=int, default=10, help='Number of trees to train.')
 
     args = parser.parse_args()
     n_clients = args.nclients
     dist = args.dist
     exec = args.exec
     db = args.database
+    estimators = args.estimators
 
     available_datasets = [ildp, adult, bank, credit2]
 
@@ -72,7 +74,7 @@ def main():  # sourcery skip: extract-duplicate-method
     server = pool.servers
 
     # Total number of estimators
-    total_estimators = 10
+    total_estimators = estimators
     print(f"Number of trees to build: {total_estimators}")
     estimators_built = 0
     # Deploy clients config
@@ -101,11 +103,11 @@ def main():  # sourcery skip: extract-duplicate-method
     print("STARTING THE TRAINIG STAGE")
     # BEGINNING OF THE TRAININ STAGE
     for round in range(total_estimators):
-        print(f"Training model number: {round}")
         if estimators_built >= total_estimators:
+            print(f"Model number: {estimators_built} has been trained. Ending training phase.")
             break
         # Each client have to build a tree, but before the gradients have to be updated
-        for cl_i, client_id_i in zip(client_ids, clients.actor_ids):
+        for cl_i, client_id_i in zip(client_ids, clients):
             client_i = pool.clients.select(select_client_by_id_from_pool, other_actor_id=client_id_i)
             # Get the hash_table from the client
             hash_vector_i = client_i.map(func=get_client_hash_tables)[0]
@@ -115,7 +117,7 @@ def main():  # sourcery skip: extract-duplicate-method
             # print(f"Client_i_id: {client_id_i}")
             # print(f"All clients ids: {clients.actor_ids}")
             # Iterate through clients to update the gradients and hessians
-            for cl_j, client_id_j in zip(client_ids, clients.actor_ids):
+            for cl_j, client_id_j in zip(client_ids, clients):
                 # Update the gradients and hessians on client_i
                 # if i!=j
                 if client_id_i != client_id_j:
@@ -148,6 +150,7 @@ def main():  # sourcery skip: extract-duplicate-method
             # TODO: client_i.map(update_gradients_hessians_local_values, idx="all")
             client_i.map(update_gradients_hessians_local_values, idx="all")
             # Train the model at the client_i
+            print(f"Training model number: {estimators_built}")
             client_i.map(train_single_tree_at_client)
             # Send the model to the server
             aggregator.map(func=collect_last_tree_trained, dst_pool=client_i)
