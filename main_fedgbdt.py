@@ -3,7 +3,9 @@ import time
 from datetime import datetime
 import argparse
 
-from flex.data import FedDataDistribution, FedDatasetConfig
+import numpy as np
+
+from flex.data import FedDataDistribution, FedDatasetConfig, one_hot_encoding
 from flex.pool import FlexPool
 
 from flextrees.datasets.tabular_datasets import ildp, adult, bank, credit2
@@ -32,6 +34,7 @@ from flextrees.pool import (
     clients_add_last_tree_trained_to_estimators,
     get_client_gradients_hessians_by_idx,
     evaluate_global_model,
+    client_global_gh_update,
     evaluate_global_model_clients_gbdt,
 )
 
@@ -58,19 +61,50 @@ def main():  # sourcery skip: extract-duplicate-method
     start_time = time.time()
 
     train_data, test_data = dataset(ret_feature_names=False, categorical=False)
+    n_labels = len(np.unique(train_data.y_data.to_numpy()))
+    # breakpoint()
     dataset_dim = train_data.to_numpy()[0].shape[1] # We need the dimension to create the LSH hyper planes
     n_clients = n_clients
     if dist == 'iid':
         federated_data = FedDataDistribution.iid_distribution(centralized_data=train_data,
-                                                            n_clients=n_clients)
+                                                            n_nodes=n_clients)
     else:
-        config_nidd = FedDatasetConfig(seed=0, n_clients=n_clients, replacement=False)
+        config_nidd = FedDatasetConfig(seed=0, n_nodes=n_clients, replacement=False)
 
         federated_data = FedDataDistribution.from_config(centralized_data=train_data,
                                                             config=config_nidd)
+    # One hot encode the labels for using softmax
+    def one_hot_encoding_(node_dataset, *args, **kwargs):
+        """Function that apply one hot encoding to the labels of a node_dataset.
+
+        Args:
+            node_dataset (Dataset): node_dataset to which apply one hot encode to her labels.
+
+        Raises:
+            ValueError: Raises value error if n_labels is not given in the kwargs argument.
+
+        Returns:
+            Dataset: Returns the node_dataset with the y_data property updated.
+        """
+        from copy import deepcopy
+        from flex.data import LazyIndexable, Dataset
+        if "n_labels" not in kwargs:
+            raise ValueError(
+                "No number of labels given. The parameter n_labels must be given through kwargs."
+            )
+        # breakpoint()
+        y_data = node_dataset.y_data.to_numpy().flatten()
+        n_labels = int(kwargs["n_labels"])
+        one_hot_labels = np.zeros((y_data.size, n_labels))
+        one_hot_labels[np.arange(y_data.size), y_data] = 1
+        new__y_data = one_hot_labels
+        return Dataset(
+            X_data=deepcopy(node_dataset.X_data),
+            y_data=LazyIndexable(new__y_data, len(new__y_data)),
+        )
+    federated_data.apply(one_hot_encoding_, n_labels=n_labels)
     # Set server config
     pool = FlexPool.client_server_architecture(federated_data, init_server_model_gbdt, dataset_dim=dataset_dim)
-
     clients = pool.clients
     aggregator = pool.aggregators
     server = pool.servers
@@ -92,12 +126,6 @@ def main():  # sourcery skip: extract-duplicate-method
     # the hash tables.
     client_ids = server._models['server']['aggregated_weights'] # Generated at client lvl
     # BEGINNING OF THE PREPROCESSING STAGE
-    # pool.aggregators.map(func=collect_hash_tables, dst_pool=pool.clients)
-    # pool.aggregators.map(func=aggregate_hash_tables)
-    # pool.aggregators.map(func=set_hash_tables_to_server, dst_pool=pool.servers)
-    # pool.servers.map(func=deploy_hash_table_to_clients, dst_pool=pool.clients)
-    # Now the server has all the hash_tables
-    # Apply the Map_reduce operation
     map_reduce_hash_tables(clients=pool.clients, server=pool.servers, aggregator=pool.aggregators)
     # print(server._models['server'].keys())
     print("END OF PREPROCESSING STAGE")
@@ -112,43 +140,29 @@ def main():  # sourcery skip: extract-duplicate-method
         for cl_i, client_id_i in zip(client_ids, clients):
             client_i = pool.clients.select(select_client_by_id_from_pool, other_actor_id=client_id_i)
             # Get the hash_table from the client
-            hash_vector_i = client_i.map(func=get_client_hash_tables)
-            # print(f"Tabla hash cliente_i: {type(hash_vector_i[0])}")
-            # print(f"Tabla hash cliente_i: {(hash_vector_i[0])}")
-            # print(f"Client_i: {client_i.actor_ids}")
-            # print(f"Client_i_id: {client_id_i}")
-            # print(f"All clients ids: {clients.actor_ids}")
+            hash_vector_i = client_i.map(func=get_client_hash_tables)[0][0]
             # Iterate through clients to update the gradients and hessians
+            # Update the gradients and hessians on client_i
+            print("Updating the client_i's global gradients with other clients gradients")
             for cl_j, client_id_j in zip(client_ids, clients):
-                # Update the gradients and hessians on client_i
-                # if i!=j
                 if client_id_i != client_id_j:
                     gradients_ = {}
                     hessians_ = {}
                     # Get the hash_table from client_id_j
                     client_j = pool.clients.select(select_client_by_id_from_pool, other_actor_id=client_id_j)
-                    hash_vector_j = client_j.map(func=get_client_hash_tables)
-                    # time.sleep(60)
-                    breakpoint()
-                    for instance_vector in hash_vector_j:
-                        for key, _ in instance_vector.items():
-                            idx_j = int(key.split(',')[1])
-                            hash_vector_i_values = [val[0] for val in hash_vector_i[0].values()]
-                            # if key in hash_vector_i[0][key]:
-                            if key in hash_vector_i_values:
-                                # Update the global values for the client_j idx
-                                client_j.map(func=update_gradients_hessians_local_values, idx=idx_j)
+                    hash_vector_j = client_j.map(func=get_client_hash_tables)[0][0]
+                    for key_j, _ in hash_vector_j.items():
+                        # for key, _ in instance_vector.items():
+                        idx_j = int(key_j.split(',')[1])
+                        for key_i in hash_vector_i.keys():
+                            if key_j in hash_vector_i[key_i]:
                                 gradients_j, hessians_j = client_j.map(func=get_client_gradients_hessians_by_idx, idx=idx_j)[0]
-                                gradients_[key] = gradients_j
-                                hessians_[key] = hessians_j
-                    # client_i.map(gh_update, gradients_, hessians_)
-                        # TODO: if idx_j in hash_vector_i[str(j)]
-                        # Update global gradients and hessians from client_m with local gradients and hessians from client m
-                        # TODO: client_j.map(update_global_local_values)
-                        # TODO: gradients, hessians = client_j.map(get_gradient_hessians_idx_j, idx_j=idx_j)
-                        # TODO: client_i.map(gh_update, gradients, hessians)
-                        # breakpoint()
+                                gradients_[key_j] = gradients_j
+                                hessians_[key_j] = hessians_j
+                    if len(gradients_):
+                        client_i.map(client_global_gh_update, gradients_=gradients_, hessians_=hessians_)
             # Conduct on client_i
+            print("Updating local gradients on client_i")
             client_i.map(update_gradients_hessians_local_values, idx="all")
             # Train the model at the client_i
             print(f"Training model number: {estimators_built}")

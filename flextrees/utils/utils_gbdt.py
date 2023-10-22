@@ -463,8 +463,25 @@ class RedisStorage(BaseStorage):
         return self.storage.lrange(key, 0, -1)
 
 
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
+def sigmoid(raw_predictions):
+    return 1 / (1 + np.exp(-raw_predictions))
+
+# def softmax(raw_predictions):
+def softmax(raw_predictions):
+    """Softmax function for multiclass classificaction.
+    The 
+
+    Args:
+        raw_predictions (np.array): Predictions from the tree
+
+    Returns:
+        np.array: Array with the class probabilities for each class.
+    """
+    # breakpoint()
+    numerator = np.exp(raw_predictions) 
+    # denominator = np.sum(np.exp(raw_predictions), axis=1).reshape(-1, 1)
+    denominator = np.sum(np.exp(raw_predictions), axis=0)
+    return numerator / denominator
 
 def first_grad(preds, labels):
     """Function to update the gradients
@@ -474,7 +491,7 @@ def first_grad(preds, labels):
     Returns:
         gradients updated
     """
-    preds = sigmoid(preds)
+    preds = softmax(preds)
     return preds - labels
 
 
@@ -486,7 +503,7 @@ def first_hess(preds):
         hess updated
     """
     ...
-    preds = sigmoid(preds)
+    preds = softmax(preds)
     return preds * (1 - preds)
 
 def update_global_gradient_hessian(gradient_, hessian_, global_gradient,

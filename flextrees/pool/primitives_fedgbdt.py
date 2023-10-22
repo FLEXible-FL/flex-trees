@@ -17,7 +17,7 @@ from flextrees.pool.aggregators_fegbdt import aggregate_transition_step
 from flextrees.utils import first_grad, first_hess, update_local_gradient_hessian
 from flextrees.utils import LSHash
 from flextrees.utils.utils_trees import TreeBoosting
-from flextrees.utils.utils_gbdt import sigmoid
+from flextrees.utils.utils_gbdt import softmax
 
 
 @init_server_model
@@ -76,10 +76,10 @@ def init_hash_tables(client_flex_model: FlexModel, client_data: Dataset, *args, 
     """Function deprecated. Moved to the server
     """
     client_flex_model['base_pred'] = np.full((client_data.X_data.to_numpy().shape[0], 1), 1).flatten().astype('float64')
-    client_flex_model['gradients'] = first_grad(client_flex_model['base_pred'], client_data.y_data.to_numpy())
+    client_flex_model['gradients'] = first_grad(client_flex_model['base_pred'], client_data.y_data.to_numpy().flatten())
     client_flex_model['hessians'] = first_hess(client_flex_model['base_pred'])
-    client_flex_model['idx'] = np.arange(len(client_data.y_data.to_numpy()))
-    client_flex_model['global_hash_table'] = {}
+    client_flex_model['idx'] = np.arange(len(client_data.X_data.to_numpy()))
+    client_flex_model['global_hash_table'] = []
     client_flex_model['global_gradients'] = {idx:0 for idx in client_flex_model['idx']}
     client_flex_model['global_hessians'] = {idx:0 for idx in client_flex_model['idx']}
 
@@ -178,6 +178,19 @@ def update_gradients_hessians_local_values(client_flex_model: FlexModel, client_
     else:
         raise ValueError(f"The {idx} is not in the client's data.")
 
+def client_global_gh_update(client_flex_model: FlexModel, client_data:Dataset, 
+                            gradients_ = None, hessians_ = None, *args, **kwargs
+                            ):
+    """Function that update the gradient and the hessian of the local client,
+    using the aggregated gradients and hessians from other clients.
+    """
+    for idx, key in enumerate(client_flex_model['global_hash_table']):
+        # key = list(row.items())[0][0]
+        for client_id_idx, val in gradients_.items():
+            if client_id_idx in gradients_.items():
+                client_flex_model['global_gradients'][idx] += val
+                client_flex_model['global_hessians'][idx] += hessians_[client_id_idx]
+
 def get_client_hash_tables(client_flex_model: FlexModel, client_data: Dataset, *args, **kwargs):
     # return client_flex_model['idx_hash_values']
     return client_flex_model['global_hash_table']
@@ -222,10 +235,11 @@ def find_instance_highest_count_hash_values(client_flex_model: FlexModel, client
     # Iterate over the local hash table
     client_id_i = client_flex_model['client_id']
     id_options = {}
+    similar_instances_ids = {}
     for instance_i in client_flex_model['idx_hash_values']:
         client_id_i = instance_i[0]
         dict_i = instance_i[1]
-        similar_instances_ids = {client_id_i: []}
+        similar_instances_ids[client_id_i] = []
         for instance_j in hash_table_j:
             client_id_j, dict_j = instance_j[0], instance_j[1]
             counts = sum(
@@ -235,16 +249,17 @@ def find_instance_highest_count_hash_values(client_flex_model: FlexModel, client
                 id_options[counts].append(client_id_j)
             else:
                 id_options[counts] = [client_id_j]
-        # Once all the has values have been processed at client, select one random
-        max_count = max(id_options.keys())
-        similar_id = id_options[max_count][random.randint(0, len(id_options[max_count])-1)] if len(
-            id_options[max_count]) > 0 else id_options[max_count]
-        similar_instances_ids[client_id_i].append(similar_id)
+            # Once all the has values have been processed at client, select one random
+            max_count = max(id_options.keys())
+            similar_id = id_options[max_count][random.randint(0, len(id_options[max_count])-1)] if len(
+                id_options[max_count]) > 0 else id_options[max_count]
+            similar_instances_ids[client_id_i].append(similar_id)
     # Add the similar_instances_ids to the clients global_hash_table
-    if client_id_i not in client_flex_model['global_hash_table']:
-        client_flex_model['global_hash_table'][client_id_i] = [list(similar_instances_ids.values())[0][0]]
-    else:
-        client_flex_model['global_hash_table'][client_id_i].append(list(similar_instances_ids.values())[0][0])
+    client_flex_model['global_hash_table'].append(similar_instances_ids)
+    # if client_id_i not in client_flex_model['global_hash_table']:
+    #     client_flex_model['global_hash_table'][client_id_i] = [list(similar_instances_ids.values())[0][0]]
+    # else:
+    #     client_flex_model['global_hash_table'][client_id_i].append(list(similar_instances_ids.values())[0][0])
 
 def train_single_tree_at_client(client_flex_model, client_data, *args, **kwargs):
     clf = TreeBoosting(max_deph=client_flex_model['clients_params']['max_depth'])
@@ -257,10 +272,15 @@ def train_single_tree_at_client(client_flex_model, client_data, *args, **kwargs)
     client_flex_model['clients_params']['estimators'].append(clf)
     # Update the base_preds after building the tree.
     client_flex_model['base_pred'] += client_flex_model['clients_params']['learning_rate'] * clf.predict(client_data.X_data.to_numpy())
+    # import time
+    # breakpoint()
+    # print(client_flex_model['clients_params']['learning_rate'] * clf.predict(client_data.X_data.to_numpy()))
+    # time.sleep(60)
+    train_labels = client_data.y_data.to_numpy().flatten()
     # Update local gradient_hessian
     gradients_, hessians_ = update_local_gradient_hessian(
         base_pred=client_flex_model['base_pred'],
-        train_labels=client_data.y_data.to_numpy()
+        train_labels=train_labels # client_data.y_data.to_numpy()
         )
     client_flex_model['gradients'] = gradients_
     client_flex_model['hessians'] = hessians_
@@ -284,20 +304,22 @@ def clients_add_last_tree_trained_to_estimators(client_flex_model, client_data, 
 @evaluate_server_model
 def evaluate_global_model(server_flex_model: FlexModel, test_data: Dataset, *args, **kwargs):
     test_data, test_labels = test_data.to_numpy()
+    test_labels = test_labels.flatten()
     preds = np.zeros(test_data.shape[0])
     estimators = server_flex_model['server_params']['estimators']
     learning_rate = server_flex_model['server_params']['learning_rate']
 
     for clf in estimators:
-        preds *= learning_rate * clf.predict(test_data)
-
-    predicted_probas = sigmoid(np.full((test_data.shape[0], 1), 1).flatten().astype('float64') + preds)
+        preds += learning_rate * clf.predict(test_data)
+    predicted_probas = softmax(np.full((test_data.shape[0], 1), 1).flatten().astype('int64') + preds)
     y_pred = np.where(predicted_probas > np.mean(predicted_probas), 1, 0)
-
+    y_pred = np.array([int(pred) for pred in y_pred])
     from sklearn import metrics
     acc, f1, report = metrics.accuracy_score(test_labels, y_pred), metrics.f1_score(test_labels, y_pred, average='macro'), metrics.classification_report(test_labels, y_pred)  # noqa: E501
+    auc = metrics.roc_auc_score(test_labels, y_pred, average='weighted')
     print(f"Accuracy: {acc}")
     print(f"F1_Macro: {f1}")
+    print(f"AUC: {auc}")
     print(report)
 
 def evaluate_global_model_clients_gbdt(
@@ -308,21 +330,22 @@ def evaluate_global_model_clients_gbdt(
     from sklearn import metrics
 
     X_test, y_test = client_data.to_numpy()
+    y_test = y_test.flatten()
     preds = np.zeros(X_test.shape[0])
     estimators = client_flex_model['clients_params']['estimators']
     learning_rate = client_flex_model['clients_params']['learning_rate']
 
     for clf in estimators:
-        preds *= learning_rate * clf.predict(X_test)
-
-    predicted_probas = sigmoid(np.full((X_test.shape[0], 1), 1).flatten().astype('float64') + preds)
+        preds += learning_rate * clf.predict(X_test)
+    predicted_probas = softmax(np.full((X_test.shape[0], 1), 1).flatten().astype('int64') + preds)
     y_pred = np.where(predicted_probas > np.mean(predicted_probas), 1, 0)
-
+    y_pred = np.array([int(pred) for pred in y_pred])
+    # y_pred = [1 for _ in y_pred]
     client_id = client_flex_model['client_id']
-
     acc, f1, report = metrics.accuracy_score(y_test, y_pred), metrics.f1_score(y_test, y_pred, average='macro'), metrics.classification_report(y_test, y_pred)  # noqa: E501
-
+    auc = metrics.roc_auc_score(y_test, y_pred, average='weighted')
     print("Results on test data at client level.")
     print(f"Accuracy: {acc}")
     print(f"Macro F1: {f1}")
+    print(f"AUC: {auc}")
     print(f"Classificarion report: \n {report}")
