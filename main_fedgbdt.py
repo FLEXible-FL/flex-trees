@@ -36,6 +36,7 @@ from flextrees.pool import (
     evaluate_global_model,
     client_global_gh_update,
     evaluate_global_model_clients_gbdt,
+    train_n_estimators,
 )
 
 
@@ -132,53 +133,9 @@ def main():  # sourcery skip: extract-duplicate-method
     # END OF PREPROCESSING STAGE
     print("STARTING THE TRAINIG STAGE")
     # BEGINNING OF THE TRAININ STAGE
-    for _ in range(total_estimators):
-        if estimators_built >= total_estimators:
-            print(f"Model number: {estimators_built} has been trained. Ending training phase.")
-            break
-        # Each client have to build a tree, but before the gradients have to be updated
-        for cl_i, client_id_i in zip(client_ids, clients):
-            client_i = pool.clients.select(select_client_by_id_from_pool, other_actor_id=client_id_i)
-            # Get the hash_table from the client
-            hash_vector_i = client_i.map(func=get_client_hash_tables)[0][0]
-            # Iterate through clients to update the gradients and hessians
-            # Update the gradients and hessians on client_i
-            print("Updating the client_i's global gradients with other clients gradients")
-            for cl_j, client_id_j in zip(client_ids, clients):
-                if client_id_i != client_id_j:
-                    gradients_ = {}
-                    hessians_ = {}
-                    # Get the hash_table from client_id_j
-                    client_j = pool.clients.select(select_client_by_id_from_pool, other_actor_id=client_id_j)
-                    hash_vector_j = client_j.map(func=get_client_hash_tables)[0][0]
-                    for key_j, _ in hash_vector_j.items():
-                        # for key, _ in instance_vector.items():
-                        idx_j = int(key_j.split(',')[1])
-                        for key_i in hash_vector_i.keys():
-                            if key_j in hash_vector_i[key_i]:
-                                gradients_j, hessians_j = client_j.map(func=get_client_gradients_hessians_by_idx, idx=idx_j)[0]
-                                gradients_[key_j] = gradients_j
-                                hessians_[key_j] = hessians_j
-                    if len(gradients_):
-                        client_i.map(client_global_gh_update, gradients_=gradients_, hessians_=hessians_)
-            # Conduct on client_i
-            print("Updating local gradients on client_i")
-            client_i.map(update_gradients_hessians_local_values, idx="all")
-            # Train the model at the client_i
-            print(f"Training model number: {estimators_built}")
-            client_i.map(train_single_tree_at_client)
-            # Send the model to the server
-            aggregator.map(func=collect_last_tree_trained, dst_pool=client_i)
-            aggregator.map(func=aggregate_transition_step)
-            aggregator.map(func=set_last_tree_trained_to_server, dst_pool=server)
-            # Deploy the model to all the clients, excect the one that trained the model
-            # as she already has it
-            clients_not_client_i = pool.clients.select(select_client_neq_id_from_pool, neq_actor_id=client_id_i)
-            server.map(func=deploy_last_clf, dst_pool=clients_not_client_i)
-            # Make all the clients, except client_i, to add the last_tree_trained
-            # to their estimators
-            clients_not_client_i.map(func=clients_add_last_tree_trained_to_estimators)
-            estimators_built += 1
+    train_n_estimators(clients=pool.clients, server=pool.servers,
+                    aggregator=pool.aggregators, total_estimators=total_estimators,
+                    client_ids=client_ids)
     # END OF TRAINING STAGE
     # EVALUATE THE GLOBAL MODEL
     # On server's side

@@ -13,6 +13,10 @@ from flex.pool.decorators import (
     init_server_model,
     set_aggregated_weights,
 )
+from flextrees.pool.pool_functions import(
+    select_client_by_id_from_pool,
+    select_client_neq_id_from_pool,
+)
 from flextrees.pool.aggregators_fegbdt import aggregate_transition_step
 from flextrees.utils import first_grad, first_hess, update_local_gradient_hessian
 from flextrees.utils import LSHash
@@ -215,8 +219,6 @@ def map_reduce_hash_tables(clients: FlexPool, server: FlexPool, aggregator: Flex
                 server.map(func=deploy_client_j_has_table_to_client, dst_pool=client_m)
                 # Once the client_m has the hash_table, he can find the better instances
                 client_m.map(func=find_instance_highest_count_hash_values)
-                # hash_table_j = client_j.map(func=get_client_hash_tables)
-                # client.map(func=find_similar_instances_hash_value, hash_table_j=hash_table_j)
             else:
                 # Instances of client m are equal to instances of client m
                 # We don't need to store them, just continue
@@ -256,10 +258,66 @@ def find_instance_highest_count_hash_values(client_flex_model: FlexModel, client
             similar_instances_ids[client_id_i].append(similar_id)
     # Add the similar_instances_ids to the clients global_hash_table
     client_flex_model['global_hash_table'].append(similar_instances_ids)
-    # if client_id_i not in client_flex_model['global_hash_table']:
-    #     client_flex_model['global_hash_table'][client_id_i] = [list(similar_instances_ids.values())[0][0]]
-    # else:
-    #     client_flex_model['global_hash_table'][client_id_i].append(list(similar_instances_ids.values())[0][0])
+
+def train_n_estimators(clients: FlexPool, server: FlexPool,
+                    aggregator: FlexPool, total_estimators: int):
+    """Function that make the training of whole training phase.
+
+    Args:
+        clients (FlexPool): Pool of clients that will train the
+        server (FlexPool): Pool of servers that will orchestate the training phase
+        aggregator (FlexPool): Pool of aggregators that will aggregate make the
+        aggregation process
+        total_estimators (int): Total estimators that the clients will build
+    """
+    estimators_built = 0
+    for _ in range(total_estimators):
+        if estimators_built >= total_estimators:
+            print(f"Model number: {estimators_built} has been trained. Ending training phase.")
+            break
+        # Each client have to build a tree, but before the gradients have to be updated
+        for client_id_i in clients:
+            client_i = clients.select(select_client_by_id_from_pool, other_actor_id=client_id_i)
+            # Get the hash_table from the client
+            hash_vector_i = client_i.map(func=get_client_hash_tables)[0][0]
+            # Iterate through clients to update the gradients and hessians
+            # Update the gradients and hessians on client_i
+            print("Updating the client_i's global gradients with other clients gradients")
+            for client_id_j in clients:
+                if client_id_i != client_id_j:
+                    gradients_ = {}
+                    hessians_ = {}
+                    # Get the hash_table from client_id_j
+                    client_j = clients.select(select_client_by_id_from_pool, other_actor_id=client_id_j)
+                    hash_vector_j = client_j.map(func=get_client_hash_tables)[0][0]
+                    for key_j, _ in hash_vector_j.items():
+                        # for key, _ in instance_vector.items():
+                        idx_j = int(key_j.split(',')[1])
+                        for key_i in hash_vector_i.keys():
+                            if key_j in hash_vector_i[key_i]:
+                                gradients_j, hessians_j = client_j.map(func=get_client_gradients_hessians_by_idx, idx=idx_j)[0]
+                                gradients_[key_j] = gradients_j
+                                hessians_[key_j] = hessians_j
+                    if len(gradients_):
+                        client_i.map(client_global_gh_update, gradients_=gradients_, hessians_=hessians_)
+            # Conduct on client_i
+            print("Updating local gradients on client_i")
+            client_i.map(update_gradients_hessians_local_values, idx="all")
+            # Train the model at the client_i
+            print(f"Training model number: {estimators_built}")
+            client_i.map(train_single_tree_at_client)
+            # Send the model to the server
+            aggregator.map(func=collect_last_tree_trained, dst_pool=client_i)
+            aggregator.map(func=aggregate_transition_step)
+            aggregator.map(func=set_last_tree_trained_to_server, dst_pool=server)
+            # Deploy the model to all the clients, excect the one that trained the model
+            # as she already has it
+            clients_not_client_i = clients.select(select_client_neq_id_from_pool, neq_actor_id=client_id_i)
+            server.map(func=deploy_last_clf, dst_pool=clients_not_client_i)
+            # Make all the clients, except client_i, to add the last_tree_trained
+            # to their estimators
+            clients_not_client_i.map(func=clients_add_last_tree_trained_to_estimators)
+            estimators_built += 1
 
 def train_single_tree_at_client(client_flex_model, client_data, *args, **kwargs):
     clf = TreeBoosting(max_deph=client_flex_model['clients_params']['max_depth'])
@@ -272,10 +330,6 @@ def train_single_tree_at_client(client_flex_model, client_data, *args, **kwargs)
     client_flex_model['clients_params']['estimators'].append(clf)
     # Update the base_preds after building the tree.
     client_flex_model['base_pred'] += client_flex_model['clients_params']['learning_rate'] * clf.predict(client_data.X_data.to_numpy())
-    # import time
-    # breakpoint()
-    # print(client_flex_model['clients_params']['learning_rate'] * clf.predict(client_data.X_data.to_numpy()))
-    # time.sleep(60)
     train_labels = client_data.y_data.to_numpy().flatten()
     # Update local gradient_hessian
     gradients_, hessians_ = update_local_gradient_hessian(
@@ -338,6 +392,7 @@ def evaluate_global_model_clients_gbdt(
     for clf in estimators:
         preds += learning_rate * clf.predict(X_test)
     predicted_probas = softmax(np.full((X_test.shape[0], 1), 1).flatten().astype('int64') + preds)
+    # breakpoint()
     y_pred = np.where(predicted_probas > np.mean(predicted_probas), 1, 0)
     y_pred = np.array([int(pred) for pred in y_pred])
     # y_pred = [1 for _ in y_pred]
