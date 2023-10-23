@@ -1,6 +1,4 @@
-import os
 import time
-from datetime import datetime
 import argparse
 
 import numpy as np
@@ -15,25 +13,10 @@ from flextrees.pool import (
     init_hash_tables,
     compute_hash_values,
     deploy_server_config_gbdt,
-    collect_last_tree_trained,
     aggregate_transition_step,
-    aggregate_hash_tables,
     collect_clients_ids,
     set_ids_clients_into_server,
-    set_hash_tables_to_server,
-    deploy_hash_table_to_clients,
-    map_reduce_hash_tables,
-    select_client_by_id_from_pool,
-    select_client_neq_id_from_pool,
-    get_client_hash_tables,
-    update_gradients_hessians_local_values,
-    train_single_tree_at_client,
-    set_last_tree_trained_to_server,
-    deploy_last_clf,
-    clients_add_last_tree_trained_to_estimators,
-    get_client_gradients_hessians_by_idx,
     evaluate_global_model,
-    client_global_gh_update,
     evaluate_global_model_clients_gbdt,
     train_n_estimators,
     preprocessing_stage,
@@ -63,7 +46,6 @@ def main():  # sourcery skip: extract-duplicate-method
 
     train_data, test_data = dataset(ret_feature_names=False, categorical=False)
     n_labels = len(np.unique(train_data.y_data.to_numpy()))
-    # breakpoint()
     dataset_dim = train_data.to_numpy()[0].shape[1] # We need the dimension to create the LSH hyper planes
     n_clients = n_clients
     if dist == 'iid':
@@ -75,35 +57,7 @@ def main():  # sourcery skip: extract-duplicate-method
         federated_data = FedDataDistribution.from_config(centralized_data=train_data,
                                                             config=config_nidd)
     # One hot encode the labels for using softmax
-    def one_hot_encoding_(node_dataset, *args, **kwargs):
-        """Function that apply one hot encoding to the labels of a node_dataset.
-
-        Args:
-            node_dataset (Dataset): node_dataset to which apply one hot encode to her labels.
-
-        Raises:
-            ValueError: Raises value error if n_labels is not given in the kwargs argument.
-
-        Returns:
-            Dataset: Returns the node_dataset with the y_data property updated.
-        """
-        from copy import deepcopy
-        from flex.data import LazyIndexable, Dataset
-        if "n_labels" not in kwargs:
-            raise ValueError(
-                "No number of labels given. The parameter n_labels must be given through kwargs."
-            )
-        # breakpoint()
-        y_data = node_dataset.y_data.to_numpy().flatten()
-        n_labels = int(kwargs["n_labels"])
-        one_hot_labels = np.zeros((y_data.size, n_labels))
-        one_hot_labels[np.arange(y_data.size), y_data] = 1
-        new__y_data = one_hot_labels
-        return Dataset(
-            X_data=deepcopy(node_dataset.X_data),
-            y_data=LazyIndexable(new__y_data, len(new__y_data)),
-        )
-    federated_data.apply(one_hot_encoding_, n_labels=n_labels)
+    federated_data.apply(one_hot_encoding, n_labels=n_labels)
     # Set server config
     pool = FlexPool.client_server_architecture(federated_data, init_server_model_gbdt, dataset_dim=dataset_dim)
     clients = pool.clients

@@ -174,12 +174,12 @@ def update_gradients_hessians_local_values(client_flex_model: FlexModel, client_
             client_flex_model['global_hessians'][idx] += client_flex_model['hessians'][idx]
         # print(f"Global_gradients after  updating: {client_flex_model['global_gradients']}")
     elif isinstance(idx, int) and idx in client_flex_model['idx']:
-        print(f"Global_gradients b4  updating idx: {client_flex_model['global_gradients'][idx]}")
+        # print(f"Global_gradients b4  updating idx: {client_flex_model['global_gradients'][idx]}")
         client_flex_model['global_gradients'][idx] += client_flex_model['gradients'][idx]
         client_flex_model['global_hessians'][idx] += client_flex_model['hessians'][idx]
-        print(f"Global_gradients b4  updating idx: {client_flex_model['global_gradients'][idx]}")
-        import time
-        time.sleep(5)
+        # print(f"Global_gradients b4  updating idx: {client_flex_model['global_gradients'][idx]}")
+        # import time
+        # time.sleep(5)
     else:
         raise ValueError(f"The {idx} is not in the client's data.")
 
@@ -313,9 +313,9 @@ def train_n_estimators(clients: FlexPool, server: FlexPool,
                     client_i = clients.select(select_client_by_id_from_pool, other_actor_id=client_i_idx)
                     _, hash_client_i = client_i.map(func=get_client_hash_tables)[0]
                     for instance_vector in hash_client_i:
+                        # Get the similar ID's for x_i from client_m
                         for key, _ in instance_vector.items():
                             client_i_id_own, idx_i = key.split(',')
-
                             if idx_i in hash_aggregated_m[client_i_id_own]:
                                 gradients_i, hessians_i = client_i.map(func=get_client_gradients_hessians_by_idx, idx=int(idx_i))[0]
                                 gradients_[key] = gradients_i
@@ -373,10 +373,10 @@ def train_n_estimators_(clients: FlexPool, server: FlexPool,
                     client_j = clients.select(select_client_by_id_from_pool, other_actor_id=client_id_j)
                     hash_vector_j = client_j.map(func=get_client_hash_tables)[0][0]
                     for key_j, _ in hash_vector_j.items():
-                        # for key, _ in instance_vector.items():
                         idx_j = int(key_j.split(',')[1])
                         for key_i in hash_vector_i.keys():
                             if key_j in hash_vector_i[key_i]:
+                                breakpoint()
                                 gradients_j, hessians_j = client_j.map(func=get_client_gradients_hessians_by_idx, idx=idx_j)[0]
                                 gradients_[key_j] = gradients_j
                                 hessians_[key_j] = hessians_j
