@@ -38,8 +38,45 @@ def aggregate_hash_tables(aggregated_weights, *args, **kwargs):
     """
     global_hash_table = []
     for hash_table in aggregated_weights:
-        global_hash_table.extend(hash_table)
-    return global_hash_table
+        global_hash_table.append(hash_table)
+    # Hash table with all the planes aggregated into a list
+    clients_global_hash_tables = []
+    for i, client_hash in enumerate(global_hash_table):
+        # List to keep the ID's and client's ID from the similar instances.
+        client_global_hash = []
+        for client_id_i, dict_i in client_hash:
+            similar_instances_ids = {client_id_i: []}
+            for j, client_hash_j in enumerate(global_hash_table):
+                if i == j:
+                    # In the same client, the most similar instance is itself, so I treat this case in client model
+                    continue
+                # Find the instance ID with the highest count of identical hash values
+                id_options = {}
+                for client_id_j, dict_j in client_hash_j:
+                    counts = sum(
+                        {
+                            k: 1 if dict_i.get(k) == dict_j.get(k) else 0
+                            for k in dict_i.keys()
+                        }.values()
+                    )
+                    if id_options.get(counts):
+                        id_options[counts].append(client_id_j)
+                    else:
+                        id_options[counts] = [client_id_j]
+                # Once all hash values have been processed at client, select one random
+                max_count = max(id_options.keys())
+                similar_id = (
+                    id_options[max_count][
+                        random.randint(0, len(id_options[max_count]) - 1)
+                    ]
+                    if len(id_options[max_count]) > 0
+                    else id_options[max_count]
+                )
+                similar_instances_ids[client_id_i].append(similar_id)
+            # Append the similar instances_ids to the client global hash table
+            client_global_hash.append(similar_instances_ids)
+        clients_global_hash_tables.append((i, client_global_hash))
+    return clients_global_hash_tables
 
 
 @aggregate_weights

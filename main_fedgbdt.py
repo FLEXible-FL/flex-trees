@@ -15,7 +15,6 @@ from flextrees.pool import (
     init_hash_tables,
     compute_hash_values,
     deploy_server_config_gbdt,
-    collect_hash_tables,
     collect_last_tree_trained,
     aggregate_transition_step,
     aggregate_hash_tables,
@@ -37,6 +36,7 @@ from flextrees.pool import (
     client_global_gh_update,
     evaluate_global_model_clients_gbdt,
     train_n_estimators,
+    preprocessing_stage,
 )
 
 
@@ -127,15 +127,19 @@ def main():  # sourcery skip: extract-duplicate-method
     # the hash tables.
     client_ids = server._models['server']['aggregated_weights'] # Generated at client lvl
     # BEGINNING OF THE PREPROCESSING STAGE
-    map_reduce_hash_tables(clients=pool.clients, server=pool.servers, aggregator=pool.aggregators)
+    preprocessing_stage(clients=pool.clients,
+                        server=pool.servers,
+                        aggregator=pool.aggregators
+                        )
+    # map_reduce_hash_tables(clients=pool.clients, server=pool.servers, aggregator=pool.aggregators)
     # print(server._models['server'].keys())
     print("END OF PREPROCESSING STAGE")
     # END OF PREPROCESSING STAGE
     print("STARTING THE TRAINIG STAGE")
     # BEGINNING OF THE TRAININ STAGE
     train_n_estimators(clients=pool.clients, server=pool.servers,
-                    aggregator=pool.aggregators, total_estimators=total_estimators,
-                    client_ids=client_ids)
+                        aggregator=pool.aggregators, total_estimators=total_estimators,
+                    )
     # END OF TRAINING STAGE
     # EVALUATE THE GLOBAL MODEL
     # On server's side

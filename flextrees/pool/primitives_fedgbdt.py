@@ -17,7 +17,7 @@ from flextrees.pool.pool_functions import(
     select_client_by_id_from_pool,
     select_client_neq_id_from_pool,
 )
-from flextrees.pool.aggregators_fegbdt import aggregate_transition_step
+from flextrees.pool.aggregators_fegbdt import aggregate_transition_step, aggregate_hash_tables
 from flextrees.utils import first_grad, first_hess, update_local_gradient_hessian
 from flextrees.utils import LSHash
 from flextrees.utils.utils_trees import TreeBoosting
@@ -147,7 +147,8 @@ def set_last_tree_trained_to_server(server_flex_model: FlexModel, last_clf, *arg
 @deploy_server_model
 def deploy_hash_table_to_clients(server_flex_model: FlexModel, *args, **kwargs):
     client_flex_model = FlexModel()
-    client_flex_model['global_hash_table'] = server_flex_model['global_hash_table']
+    table_idx = kwargs['table_idx']
+    client_flex_model['global_hash_table'] = server_flex_model['global_hash_table'][table_idx]
     # Once the client has the hash table, we can initialize the global gradients
     return client_flex_model
 
@@ -199,6 +200,10 @@ def get_client_hash_tables(client_flex_model: FlexModel, client_data: Dataset, *
     # return client_flex_model['idx_hash_values']
     return client_flex_model['global_hash_table']
 
+def get_client_hash_tables_aggregated(client_flex_model: FlexModel, client_data: Dataset, *args, **kwargs):
+    # return client_flex_model['idx_hash_values']
+    return client_flex_model['global_hash_table_aggregated']
+
 def get_client_gradients_hessians_by_idx(client_flex_model: FlexModel, client_data: Dataset, *args, **kwargs):
     idx = kwargs['idx']
     if isinstance(idx, int) and idx in client_flex_model['idx']:
@@ -224,6 +229,38 @@ def map_reduce_hash_tables(clients: FlexPool, server: FlexPool, aggregator: Flex
                 # We don't need to store them, just continue
                 ...
             
+
+def preprocessing_stage(clients: FlexPool, server: FlexPool, aggregator: FlexPool):
+    """Function that create the global hash table for each client.
+
+    Args:
+        clients (FlexPool): Pool of clients.
+        server (FlexPool): Pool of servers.
+        aggregator (FlexPool): Pool of aggregators.
+    """
+    aggregator.map(func=collect_hash_tables, dst_pool=clients)
+    aggregator.map(func=aggregate_hash_tables, clients=clients)
+    aggregator.map(func=set_hash_tables_to_server, dst_pool=server)
+    for idx, client_i in enumerate(clients):
+        client = clients.select(select_client_by_id_from_pool, other_actor_id=client_i)
+        server.map(func=deploy_hash_table_to_clients, dst_pool=client, table_idx=idx)
+    clients.map(func=merge_client_hash_table_instances)
+
+def merge_client_hash_table_instances(client_flex_model: FlexModel, client_data: Dataset, *args, **kwargs):
+    """Function that aggregated the ids from the same client into one vector.
+    """
+    aggregated_clients_idx = {}
+    global_hash_table = client_flex_model['global_hash_table'][1]
+    for instance_vector in global_hash_table:
+        for _, lst_idx in instance_vector.items():
+            for element in lst_idx:
+                client_id, instance_id = element.split(',')
+                if client_id not in aggregated_clients_idx:
+                    aggregated_clients_idx[client_id] = [instance_id]
+                else:
+                    aggregated_clients_idx[client_id].append(instance_id)
+    client_flex_model['global_hash_table_aggregated'] = aggregated_clients_idx
+    
 
 def find_instance_highest_count_hash_values(client_flex_model: FlexModel, client_data: Dataset, *args, **kwargs):
     """Function that computes on client the operations to find the similar instances
@@ -261,6 +298,51 @@ def find_instance_highest_count_hash_values(client_flex_model: FlexModel, client
 
 def train_n_estimators(clients: FlexPool, server: FlexPool,
                     aggregator: FlexPool, total_estimators: int):
+    estimators_built = 0
+    for _ in range(total_estimators):
+        if estimators_built >= total_estimators:
+            print(f"Model number: {estimators_built} has been trained. Ending training phase.")
+            break
+        for m, client_m_idx in enumerate(clients):
+            client_m = clients.select(select_client_by_id_from_pool, other_actor_id=client_m_idx)
+            hash_aggregated_m = client_m.map(func=get_client_hash_tables_aggregated)[0]
+            for i, client_i_idx in enumerate(clients):
+                if i != m:
+                    gradients_ = {}
+                    hessians_ = {}
+                    client_i = clients.select(select_client_by_id_from_pool, other_actor_id=client_i_idx)
+                    _, hash_client_i = client_i.map(func=get_client_hash_tables)[0]
+                    for instance_vector in hash_client_i:
+                        for key, _ in instance_vector.items():
+                            client_i_id_own, idx_i = key.split(',')
+
+                            if idx_i in hash_aggregated_m[client_i_id_own]:
+                                gradients_i, hessians_i = client_i.map(func=get_client_gradients_hessians_by_idx, idx=int(idx_i))[0]
+                                gradients_[key] = gradients_i
+                                hessians_[key] = hessians_i
+                    if len(gradients_):
+                        client_m.map(client_global_gh_update, gradients_=gradients_, hessians_=hessians_)
+            # Conduct on client_m
+            print("Updating local gradients on client_i")
+            client_m.map(update_gradients_hessians_local_values, idx="all")
+            # Train the model at the client_i
+            print(f"Training model number: {estimators_built}")
+            client_m.map(train_single_tree_at_client)
+            # Send the model to the server
+            aggregator.map(func=collect_last_tree_trained, dst_pool=client_m)
+            aggregator.map(func=aggregate_transition_step)
+            aggregator.map(func=set_last_tree_trained_to_server, dst_pool=server)
+            # Deploy the model to all the clients, excect the one that trained the model
+            # as she already has it
+            clients_not_client_m = clients.select(select_client_neq_id_from_pool, neq_actor_id=client_m_idx)
+            server.map(func=deploy_last_clf, dst_pool=clients_not_client_m)
+            # Make all the clients, except client_i, to add the last_tree_trained
+            # to their estimators
+            clients_not_client_m.map(func=clients_add_last_tree_trained_to_estimators)
+            estimators_built += 1
+
+def train_n_estimators_(clients: FlexPool, server: FlexPool,
+                    aggregator: FlexPool, total_estimators: int):
     """Function that make the training of whole training phase.
 
     Args:
@@ -282,7 +364,7 @@ def train_n_estimators(clients: FlexPool, server: FlexPool,
             hash_vector_i = client_i.map(func=get_client_hash_tables)[0][0]
             # Iterate through clients to update the gradients and hessians
             # Update the gradients and hessians on client_i
-            print("Updating the client_i's global gradients with other clients gradients")
+            # print("Updating the client_i's global gradients with other clients gradients")
             for client_id_j in clients:
                 if client_id_i != client_id_j:
                     gradients_ = {}

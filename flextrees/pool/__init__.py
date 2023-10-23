@@ -58,6 +58,8 @@ from flextrees.pool.primitives_fedgbdt import client_global_gh_update
 from flextrees.pool.primitives_fedgbdt import evaluate_global_model
 from flextrees.pool.primitives_fedgbdt import evaluate_global_model_clients_gbdt
 from flextrees.pool.primitives_fedgbdt import train_n_estimators
+
+from flextrees.pool.primitives_fedgbdt import preprocessing_stage
 # Functions from pool_functions
 from flextrees.pool.pool_functions import select_client_by_id_from_pool
 from flextrees.pool.pool_functions import select_client_neq_id_from_pool
