@@ -52,7 +52,9 @@ def main():  # sourcery skip: extract-duplicate-method
         federated_data = FedDataDistribution.iid_distribution(centralized_data=train_data,
                                                             n_nodes=n_clients)
     else:
-        config_nidd = FedDatasetConfig(seed=0, n_nodes=n_clients, replacement=False)
+        weights = np.random.dirichlet(np.repeat(1, n_clients), 1)[0] # To generate random weights (Full Non-IID)
+        config_nidd = FedDatasetConfig(seed=0, n_nodes=n_clients, 
+                                    replacement=False, weights=weights)
 
         federated_data = FedDataDistribution.from_config(centralized_data=train_data,
                                                             config=config_nidd)
@@ -60,14 +62,10 @@ def main():  # sourcery skip: extract-duplicate-method
     federated_data.apply(one_hot_encoding, n_labels=n_labels)
     # Set server config
     pool = FlexPool.client_server_architecture(federated_data, init_server_model_gbdt, dataset_dim=dataset_dim)
-    clients = pool.clients
-    aggregator = pool.aggregators
-    server = pool.servers
 
     # Total number of estimators
     total_estimators = estimators
     print(f"Number of trees to build: {total_estimators}")
-    estimators_built = 0
     # Deploy clients config
     pool.servers.map(func=deploy_server_config_gbdt, dst_pool=pool.clients)
     # Preprocessing Stage
@@ -77,16 +75,11 @@ def main():  # sourcery skip: extract-duplicate-method
     pool.aggregators.map(func=collect_clients_ids, dst_pool=pool.clients)
     pool.aggregators.map(func=aggregate_transition_step)
     pool.aggregators.map(func=set_ids_clients_into_server, dst_pool=pool.servers)
-    # As client_ids are randomized, we need to collect them before sending
-    # the hash tables.
-    client_ids = server._models['server']['aggregated_weights'] # Generated at client lvl
     # BEGINNING OF THE PREPROCESSING STAGE
     preprocessing_stage(clients=pool.clients,
                         server=pool.servers,
                         aggregator=pool.aggregators
                         )
-    # map_reduce_hash_tables(clients=pool.clients, server=pool.servers, aggregator=pool.aggregators)
-    # print(server._models['server'].keys())
     print("END OF PREPROCESSING STAGE")
     # END OF PREPROCESSING STAGE
     print("STARTING THE TRAINIG STAGE")
@@ -97,9 +90,9 @@ def main():  # sourcery skip: extract-duplicate-method
     # END OF TRAINING STAGE
     # EVALUATE THE GLOBAL MODEL
     # On server's side
-    server.map(evaluate_global_model, test_data=test_data)
+    pool.servers.map(evaluate_global_model, test_data=test_data)
     # On clients side
-    clients.map(evaluate_global_model_clients_gbdt)
+    pool.clients.map(evaluate_global_model_clients_gbdt)
     # server.map(evaluate_server_global_model, test_data=test_data) # Future names aprox
     print("Finish script")
 
