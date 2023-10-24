@@ -2,8 +2,6 @@ import random
 from copy import deepcopy
 
 import numpy as np
-import pandas as pd
-from flex.pool import FlexPool
 from flex.model import FlexModel
 
 from flextrees.utils import GlobalRandomForest

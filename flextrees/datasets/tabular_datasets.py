@@ -12,6 +12,7 @@ def ildp(out_dit: str  = ".", ret_feature_names=False, categorical=False):
     Returns:
         tuple: Train and test data.
     """
+    import numpy as np
     from ucimlrepo import fetch_ucirepo
     # fetch dataset from UCI repository
     ilpd_indian_liver_patient_dataset = fetch_ucirepo(id=225)
@@ -25,7 +26,7 @@ def ildp(out_dit: str  = ".", ret_feature_names=False, categorical=False):
     X_data = X_data.to_numpy()
     # Get the target values
     y_data = ilpd_indian_liver_patient_dataset.data.targets.iloc[X_data_index].to_numpy()
-
+    y_data = np.array([y_real-1 for y_real in y_data])
     from sklearn.model_selection import train_test_split
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.1)
     train_data_object = Dataset.from_numpy(X_data, y_data)
