@@ -61,7 +61,7 @@ def main():  # sourcery skip: extract-duplicate-method
     # One hot encode the labels for using softmax
     federated_data.apply(one_hot_encoding, n_labels=n_labels)
     # Set server config
-    pool = FlexPool.client_server_architecture(federated_data, init_server_model_gbdt, dataset_dim=dataset_dim)
+    pool = FlexPool.client_server_pool(federated_data, init_server_model_gbdt, dataset_dim=dataset_dim)
 
     # Total number of estimators
     total_estimators = estimators

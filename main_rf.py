@@ -44,14 +44,15 @@ def main():
     n_clients = n_clients
     if dist == 'iid':
         federated_data = FedDataDistribution.iid_distribution(centralized_data=train_data,
-                                                            n_clients=n_clients)
+                                                            n_nodes=n_clients)
     else:
-        config_nidd = FedDatasetConfig(seed=0, n_clients=n_clients, replacement=False)
+        config_nidd = FedDatasetConfig(seed=0, n_nodes=2, replacement=False,
+                                    weights=[0.15, 0.85])
 
         federated_data = FedDataDistribution.from_config(centralized_data=train_data,
                                                             config=config_nidd)
     # Set server config
-    pool = FlexPool.client_server_architecture(federated_data, init_server_model_rf)
+    pool = FlexPool.client_server_pool(federated_data, init_server_model_rf)
 
     clients = pool.clients
     aggregator = pool.aggregators
@@ -60,7 +61,8 @@ def main():
     # Total number of estimators
     total_estimators = 100
     # Number of estimators per client
-    nr_estimators = total_estimators // n_clients
+    # nr_estimators = total_estimators // n_clients
+    nr_estimators = total_estimators
 
     # Deploy clients config
     pool.servers.map(func=deploy_server_config_rf, dst_pool=pool.clients)
