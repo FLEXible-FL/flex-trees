@@ -129,9 +129,10 @@ def evaluate_global_rf_model_at_clients(
     client_id = client_flex_model['client_id']
 
     acc, f1, report = metrics.accuracy_score(y_test, y_pred), metrics.f1_score(y_test, y_pred, average='macro'), metrics.classification_report(y_test, y_pred)
-
+    auc = metrics.roc_auc_score(y_test, y_pred)
     print("Results on client: ", client_id)
     print(f"Accuracy: {acc}, F1: {f1}")
+    print(f"Auc: {auc}")
     print(f"Classification report: {report}")
 
 def evaluate_local_rf_model_at_clients(
@@ -149,8 +150,9 @@ def evaluate_local_rf_model_at_clients(
     client_id = client_flex_model['client_id']
 
     acc, f1, report = metrics.accuracy_score(y_test, y_pred), metrics.f1_score(y_test, y_pred, average='macro'), metrics.classification_report(y_test, y_pred)
-
+    auc = metrics.roc_auc_score(y_test, y_pred)
     print("Local results on client: ", client_id)
     print(f"Accuracy: {acc}, F1: {f1}")
+    print(f"Auc: {auc}")
     print(f"Classification report: {report}")
     
