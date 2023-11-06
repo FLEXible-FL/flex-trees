@@ -126,7 +126,7 @@ def adult(out_dir: str = '.', ret_feature_names: bool = False, categorical=True)
     if not os.path.exists(f"{out_dir}/adult_train.csv"):
         path_to_train = 'http://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data'
         path_to_test = 'http://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.test'
-        x_columns = ['x' + str(i) for i in range(14)]
+        x_columns = [f"x{str(i)}" for i in range(14)]
         y_column = 'label'
         train_data = pd.read_csv(path_to_train, names=x_columns + [y_column])
         test_data = pd.read_csv(path_to_test, names=x_columns + [y_column])
