@@ -80,8 +80,15 @@ def nursery(out_dir: str = '.', ret_feature_names: bool = False, categorical=Tru
         dataset.to_csv(f"{out_dir}/nursery.csv", index=False)
     else:
         dataset = pd.read_csv(f"{out_dir}/nursery.csv")
+
     y_data = dataset['label'].to_numpy()
     X_data = dataset.drop(columns=['label'], axis=1).to_numpy()
+
+    if not categorical:
+        from sklearn.feature_extraction import DictVectorizer
+        dv = DictVectorizer()
+        dv_data = dv.fit_transform([dict(row) for index, row in dataset[col_names[:-1]].iterrows()])
+        X_data = dv_data.toarray()
 
     from sklearn.model_selection import train_test_split
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.2)
@@ -119,7 +126,7 @@ def adult(out_dir: str = '.', ret_feature_names: bool = False, categorical=True)
     if not os.path.exists(f"{out_dir}/adult_train.csv"):
         path_to_train = 'http://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data'
         path_to_test = 'http://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.test'
-        x_columns = ['x' + str(i) for i in range(14)]
+        x_columns = [f"x{str(i)}" for i in range(14)]
         y_column = 'label'
         train_data = pd.read_csv(path_to_train, names=x_columns + [y_column])
         test_data = pd.read_csv(path_to_test, names=x_columns + [y_column])
