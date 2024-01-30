@@ -1,9 +1,8 @@
-from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import absolute_import
 
 # Primitive for ID3
-from flextrees.pool.aggregators_fedid3 import id3_agg
 from flextrees.pool.aggregators_fedid3 import id3_aggregate_counts
 from flextrees.pool.aggregators_fedid3 import id3_aggegate_class_counts
 from flextrees.pool.aggregators_fedid3 import id3_aggregate_class_counts_sum
