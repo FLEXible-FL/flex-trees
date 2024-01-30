@@ -92,8 +92,8 @@ def nursery(out_dir: str = '.', ret_feature_names: bool = False, categorical=Tru
 
     from sklearn.model_selection import train_test_split
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.2)
-    train_data_object = Dataset.from_numpy(X_data, y_data)
-    test_data_object = Dataset.from_numpy(X_test, y_test)
+    train_data_object = Dataset.from_array(X_data, y_data)
+    test_data_object = Dataset.from_array(X_test, y_test)
     col_names = [f"x{i}" for i in range(len(col_names))]
     if ret_feature_names:
         return train_data_object, test_data_object, col_names
@@ -159,8 +159,8 @@ def adult(out_dir: str = '.', ret_feature_names: bool = False, categorical=True)
     # y_test = test_labels.to_numpy()
     # X_test = test_data.to_numpy()
 
-    train_data_object = Dataset.from_numpy(X_data, y_data)
-    test_data_object = Dataset.from_numpy(X_test, y_test)
+    train_data_object = Dataset.from_array(X_data, y_data)
+    test_data_object = Dataset.from_array(X_test, y_test)
     if ret_feature_names:
         col_names = [f"x{i}" for i in range(len(list(train_data.columns)))]
         col_names += ['label']
@@ -200,8 +200,8 @@ def bank(out_dir: str = '.', ret_feature_names: bool = False, categorical=False)
 
     from sklearn.model_selection import train_test_split
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.3)
-    train_data_object = Dataset.from_numpy(X_data, y_data)
-    test_data_object = Dataset.from_numpy(X_test, y_test)
+    train_data_object = Dataset.from_array(X_data, y_data)
+    test_data_object = Dataset.from_array(X_test, y_test)
     return train_data_object, test_data_object
 
 def magic(out_dir: str = '.'):
@@ -226,8 +226,8 @@ def magic(out_dir: str = '.'):
 
     from sklearn.model_selection import train_test_split
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.3)
-    train_data_object = Dataset.from_numpy(X_data, y_data)
-    test_data_object = Dataset.from_numpy(X_test, y_test)
+    train_data_object = Dataset.from_array(X_data, y_data)
+    test_data_object = Dataset.from_array(X_test, y_test)
     return train_data_object, test_data_object
 
 def car(out_dir: str = '.', ret_feature_names: bool = False, categorical=True):
@@ -294,8 +294,8 @@ def car(out_dir: str = '.', ret_feature_names: bool = False, categorical=True):
 
     from sklearn.model_selection import train_test_split
     X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.3)
-    train_data_object = Dataset.from_numpy(X_data, y_data)
-    test_data_object = Dataset.from_numpy(X_test, y_test)
+    train_data_object = Dataset.from_array(X_data, y_data)
+    test_data_object = Dataset.from_array(X_test, y_test)
     if ret_feature_names:
         return train_data_object, test_data_object, col_names
     return train_data_object, test_data_object

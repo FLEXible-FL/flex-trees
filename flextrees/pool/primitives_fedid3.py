@@ -9,7 +9,6 @@ from flex.model import FlexModel
 from flextrees.utils import (
     ID3, Node, reach_root_node, get_df_cut,
     get_feature_with_max_information_gain,
-    client_write_results, server_write_results
 )
 
 from flex.pool.decorators import (
@@ -105,9 +104,6 @@ def evaluate_id3_model(server_flex_model, test_data, *args, **kwargs):
     print(report)
     print(f"Accuracy: {acc}")
     print(f"F1-Macro: {f1}")
-    server_write_results(filename=kwargs['filename'], client_id='server',
-                        acc_local=acc, f1_local=f1, tam_test_data=len(test_labels),
-                        etime=kwargs['etime'])
 
 # Function that calculate the counts in the clients.
 def calculate_counts(client_flex_model, client_data, *args, **kwargs):
@@ -320,5 +316,3 @@ def evaluate_global_model_clients(
     print(f"Accuracy: {acc}")
     print(f"Macro F1: {f1}")
     print(f"Classificarion report: \n {report}")
-    client_write_results(filename=kwargs['filename'], client_id=client_id,
-                        acc_local=acc, f1_local=f1, tam_test_data=len(y_test))

@@ -8,5 +8,5 @@ setup(
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     packages=find_packages(),
-    install_requires=["flex", "numpy", "bitarray", "ucimlrepo"],
+    install_requires=["flex", "numpy", "bitarray", "ucimlrepo", "future"],
 )
