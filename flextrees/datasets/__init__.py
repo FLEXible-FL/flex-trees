@@ -1,6 +1,6 @@
-from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import absolute_import
 
 from flextrees.datasets.tabular_datasets import credit2
 from flextrees.datasets.tabular_datasets import nursery
