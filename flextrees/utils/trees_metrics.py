@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024  Instituto Andaluz Interuniversitario en Ciencia de Datos e Inteligencia Computacional (DaSCI)
+Copyright (C) 2024  Instituto Andaluz Interuniversitario en Ciencia de Datos e Inteligencia Computacional (DaSCI).
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -14,10 +14,11 @@ Copyright (C) 2024  Instituto Andaluz Interuniversitario en Ciencia de Datos e I
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import os
 import csv
 import math
+import os
 from collections import deque
+
 
 def get_feature_with_max_information_gain(X, y, x_ids, feature_ids, _features):
     """Function that calculate the information gian for all the features available
@@ -29,13 +30,15 @@ def get_feature_with_max_information_gain(X, y, x_ids, feature_ids, _features):
         feature_ids: ids of the available features
     """
     # print('Get feature max info gain')
-    features_info_gain = [information_gain(X, y, x_ids, feature_id)
-                            for feature_id in feature_ids]
+    features_info_gain = [
+        information_gain(X, y, x_ids, feature_id) for feature_id in feature_ids
+    ]
     split = {
-        _features[feature_id]:features_info_gain[i] 
+        _features[feature_id]: features_info_gain[i]
         for i, feature_id in enumerate(feature_ids)
     }
     return split
+
 
 def information_gain(X, y, x_ids, feature_id):
     """Calculate information gain for the remaining data for a feature
@@ -53,9 +56,7 @@ def information_gain(X, y, x_ids, feature_id):
     feature_set_values = list(set(feature_values))
     feature_val_count = [feature_values.count(x) for x in feature_set_values]
     feature_val_id = [
-        [x_ids[i]
-            for i, x in enumerate(feature_values)
-            if x == feat]
+        [x_ids[i] for i, x in enumerate(feature_values) if x == feat]
         for feat in feature_set_values
     ]
     info_gain_feature = sum(
@@ -65,6 +66,7 @@ def information_gain(X, y, x_ids, feature_id):
     info_gain -= info_gain_feature
 
     return info_gain
+
 
 def entropy(x_ids, y):
     """Calculates the entropy
@@ -81,11 +83,11 @@ def entropy(x_ids, y):
     label_count = [labels.count(x) for x in set(y)]
     # Calculate the entropy of each category and sum them
     entropy = sum(
-        -count / len(x_ids) * math.log(count / len(x_ids), 2)
-        if count else 0
+        -count / len(x_ids) * math.log(count / len(x_ids), 2) if count else 0
         for count in label_count
     )
     return entropy
+
 
 def reach_root_node(node):
     """Function to reach root node in a tree.
@@ -102,6 +104,7 @@ def reach_root_node(node):
     stack.reverse()
     return stack
 
+
 def get_df_cut(df_, stack):
     """Function that receive a stack and get the dataframe cut to the values
     of the features.
@@ -111,7 +114,7 @@ def get_df_cut(df_, stack):
         stack: stack with the path from the node to the root path.
     """
     # Transform the stack into a list that contains tuples (feature, value).
-    root_path = [(stack[i], stack[i+1]) for i in range(0, len(stack), 2)]
+    root_path = [(stack[i], stack[i + 1]) for i in range(0, len(stack), 2)]
     # Query method can be faster then the for loop.
     # query = ' and '.join(feature+"=="+'"'+str(value)+'"' for feature, value in root_path)
     # df = self._df.query(query) if root_path else self._df
@@ -122,26 +125,34 @@ def get_df_cut(df_, stack):
     x_ids = list(df_.index)
     return x_ids, df_
 
-def client_write_results(filename, client_id, acc_local, f1_local,
-                        tam_test_data):
+
+def client_write_results(filename, client_id, acc_local, f1_local, tam_test_data):
     if not os.path.exists(filename):
-        header = ['client_id', 'local_model_acc', 'local_model_f1', 'tam_test_data']
-        with open(filename, 'a', newline='', encoding='utf-8') as f:
+        header = ["client_id", "local_model_acc", "local_model_f1", "tam_test_data"]
+        with open(filename, "a", newline="", encoding="utf-8") as f:
             wr = csv.writer(f)
             wr.writerow(header)
     results = [client_id, acc_local, f1_local, tam_test_data]
-    with open(filename, 'a', newline='', encoding='utf-8') as f:
+    with open(filename, "a", newline="", encoding="utf-8") as f:
         wr = csv.writer(f)
         wr.writerow(results)
 
-def server_write_results(filename, client_id, acc_local, f1_local,
-                        tam_test_data, etime):
+
+def server_write_results(
+    filename, client_id, acc_local, f1_local, tam_test_data, etime
+):
     if not os.path.exists(filename):
-        header = ['client_id', 'local_model_acc', 'local_model_f1', 'tam_test_data', 'time']
-        with open(filename, 'a', newline='', encoding='utf-8') as f:
+        header = [
+            "client_id",
+            "local_model_acc",
+            "local_model_f1",
+            "tam_test_data",
+            "time",
+        ]
+        with open(filename, "a", newline="", encoding="utf-8") as f:
             wr = csv.writer(f)
             wr.writerow(header)
     results = [client_id, acc_local, f1_local, tam_test_data, etime]
-    with open(filename, 'a', newline='', encoding='utf-8') as f:
+    with open(filename, "a", newline="", encoding="utf-8") as f:
         wr = csv.writer(f)
         wr.writerow(results)

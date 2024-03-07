@@ -1,5 +1,5 @@
 """
-Copyright (C) 2024  Instituto Andaluz Interuniversitario en Ciencia de Datos e Inteligencia Computacional (DaSCI)
+Copyright (C) 2024  Instituto Andaluz Interuniversitario en Ciencia de Datos e Inteligencia Computacional (DaSCI).
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -18,7 +18,7 @@ from copy import deepcopy
 
 
 class GlobalRandomForest:
-    def __init__(self, max_depth=5, n_estimators=10, estimators_ = None) -> None:
+    def __init__(self, max_depth=5, n_estimators=10, estimators_=None) -> None:
         self.max_depth = max_depth
         self.n_estimators = n_estimators
         self.estimators_ = [] if estimators_ is None else estimators_
@@ -40,8 +40,10 @@ class GlobalRandomForest:
                 if i not in predictions:
                     predictions[i] = []
                 predictions[i].append(p)
+
         def most_common(lst):
             return max(set(lst), key=lst.count)
+
         predictions = [most_common(predictions[i]) for i in range(len(predictions))]
         return predictions
 
