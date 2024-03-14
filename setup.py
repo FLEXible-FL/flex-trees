@@ -18,7 +18,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="flextrees",
-    version="0.1.0",
+    version="0.1.1.b1",
     author="Alberto Argente-Garrido",
     keywords="decision-trees explainable FL federated-learning flexible",
     long_description=open("README.md", "r", encoding="utf-8").read(),
