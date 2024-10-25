@@ -64,4 +64,5 @@ If you use this package, please cite the following paper:
   author={Herrera, Francisco and Jim{\'e}nez-L{\'o}pez, Daniel and Argente-Garrido, Alberto and Rodr{\'\i}guez-Barroso, Nuria and Zuheros, Cristina and Aguilera-Martos, Ignacio and Bello, Beatriz and Garc{\'\i}a-M{\'a}rquez, Mario and Luz{\'o}n, M},
   journal={arXiv preprint arXiv:2404.06127},
   year={2024}
-} ```
+} 
+```
