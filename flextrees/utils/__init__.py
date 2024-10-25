@@ -18,7 +18,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
 
-from flextrees.utils.utils_trees import *
+from flextrees.utils.utils_trees import *  # noqa: F403
 from flextrees.utils.trees_metrics import get_feature_with_max_information_gain
 from flextrees.utils.trees_metrics import information_gain
 from flextrees.utils.trees_metrics import entropy
@@ -34,3 +34,12 @@ from flextrees.utils.utils_gbdt import storage
 from flextrees.utils.utils_gbdt import BaseStorage
 from flextrees.utils.utils_gbdt import RedisStorage
 from flextrees.utils.utils_gbdt import update_local_gradient_hessian
+
+from flextrees.utils.Branch import *  # noqa: F403
+from flextrees.utils.branch_categorical import *  # noqa: F403
+from flextrees.utils.branch_mixed import *  # noqa: F403
+from flextrees.utils.branch_tree import *  # noqa: F403
+from flextrees.utils.branch_tree_categorical import *  # noqa F403
+from flextrees.utils.ConjunctionSet import *  # noqa: F403
+from flextrees.utils.utils_function_aggregator import *  # noqa: F403
+from flextrees.utils.c45_tree import *  # noqa: F403

@@ -115,6 +115,43 @@ def nursery(out_dir: str = '.', ret_feature_names: bool = False, categorical=Tru
         return train_data_object, test_data_object, col_names
     return train_data_object, test_data_object
 
+def adult_raw(out_dir: str = '.', categorical=False):
+    import os
+    import pandas as pd
+    if not os.path.exists(f"{out_dir}/adult_train.csv"):
+        path_to_train = 'http://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data'
+        path_to_test = 'http://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.test'
+        x_columns = ['x' + str(i) for i in range(14)]
+        y_column = 'label'
+        train_data = pd.read_csv(path_to_train, names=x_columns + [y_column])
+        test_data = pd.read_csv(path_to_test, names=x_columns + [y_column])
+        test_data = test_data.iloc[1:]
+        test_data['x0'] = [int(val) for val in test_data['x0']]
+
+        train_labels = train_data.apply(lambda row: 1 if '>50K' in row['label'] else 0, axis=1).to_numpy()
+        test_labels = test_data.apply(lambda row: 1 if '>50K' in row['label'] else 0, axis=1).to_numpy()
+        train_data['label'] = train_labels
+        test_data['label'] = test_labels
+        train_data.to_csv(f"{out_dir}/adult_train.csv", index=False)
+        test_data.to_csv(f"{out_dir}/adult_test.csv", index=False)
+    else:
+        train_data = pd.read_csv(f"{out_dir}/adult_train.csv")
+        test_data = pd.read_csv(f"{out_dir}/adult_test.csv")
+    train_labels = train_data['label']
+    test_labels = test_data['label']
+    train_data = train_data.drop(columns=['label'], axis=1)
+    test_data = test_data.drop(columns=['label'], axis=1)
+    y_data = train_labels.to_numpy()
+    X_data = train_data.to_numpy()
+    from sklearn.model_selection import train_test_split
+    X_data, X_test, y_data, y_test = train_test_split(X_data, y_data, test_size=0.3)
+    # y_test = test_labels.to_numpy()
+    # X_test = test_data.to_numpy()
+
+    train_data_object = Dataset.from_array(X_data, y_data)
+    test_data_object = Dataset.from_array(X_test, y_test)
+    return train_data_object, test_data_object
+
 def adult(out_dir: str = '.', ret_feature_names: bool = False, categorical=True):
     """Function that load the adult dataset from the UCI database
 

@@ -10,6 +10,7 @@ The methods implemented in the repository are:
 | Federated ID3 | The ID3 model adapted to a federated learning scenario. | [A Hybrid Approach to Privacy-Preserving Federated Learning](https://arxiv.org/pdf/1812.03224.pdf) |
 | Federated Random Forest | The Random Forest (RF) model adapted to a federated learning scenario. Each client builds a RF locally, then `N` trees are randomly sampled from each client to get a global RF composed from the `N` trees retrieved from the clients. | [Federated Random Forests can improve local performance of predictive models for various healthcare applications](https://pubmed.ncbi.nlm.nih.gov/35139148/) |
 | Federated Gradient Boosting Decision Trees | The Gradient Boosting Decision Trees model adapted to a federated learning scenario. In this model a global hash table is first created to aling the data between the clients within sharing it. After that, `N` trees (CART) are built by the clients. The process of building the ensemble is iterative, and one client builds the tree, then it is added to the ensemble, and after that the weights of the instances is updated, so the next client can build the next tree with the weights updated.| [Practical Federated Gradient Boosting Decision Trees](https://arxiv.org/abs/1911.04206) |
+| Interpretable Client Decision Tree Aggregation For Federated Learning process (ICDTA4FL process) | The ICDTA4FL process is a process that allows the clients to build a decision tree locally, and then the trees are aggregated in a global tree by merging the rules extracted from the local trees. The process is iterative, and the clients can build a tree, then the trees that surpass a threshold are selected to be merged. In order the merge the trees, these are transformed into rules, and then the merged rules are used to build a global tree. This process is tree independent, and the code is available for merging ID3, CART and C4.5 trees. | [Interpretable Client Decision Tree Aggregation For Federated Learning process](https://arxiv.org/pdf/2404.02510) |
 
 The tabular datasets available in the repository are:
 | `Dataset`            | `Description`      | `Citation`              |
@@ -58,4 +59,9 @@ pip install -e .
 
 If you use this package, please cite the following paper:
 
-``` TODO: Add citation ```
+``` @article{herrera2024flex,
+  title={FLEX: FLEXible Federated Learning Framework},
+  author={Herrera, Francisco and Jim{\'e}nez-L{\'o}pez, Daniel and Argente-Garrido, Alberto and Rodr{\'\i}guez-Barroso, Nuria and Zuheros, Cristina and Aguilera-Martos, Ignacio and Bello, Beatriz and Garc{\'\i}a-M{\'a}rquez, Mario and Luz{\'o}n, M},
+  journal={arXiv preprint arXiv:2404.06127},
+  year={2024}
+} ```
